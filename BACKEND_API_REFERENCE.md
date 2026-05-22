@@ -859,18 +859,8 @@ both produce identical ISOs
  **Zero Qt Dependencies**: Backend completely Qt-free  
  **Functionally Equivalent**: Byte-for-byte verified against Qt implementation: ok
  **Architecture**: Separation of planning and execution  
- **Flexible**: Works with any UI framework (Qt, GTK, CLI, web, etc.)  
+ **Flexible**: Should work with any UI framework (Qt, GTK, CLI, web, etc.)  
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
-- **Source Code**: `src/batchprocessing_cpp_*.{h,cpp}`, `src/work_cpp_*.{h,cpp}`
-- **Tests**: `tests/unit_tests.cpp`
-- **Reference Implementation**: `src/main.cpp` (CLI_BUILD section)
 
-- Exécution de `mksquashfs` pour créer `linuxfs`
-- Remplacement des strings dans les menus de boot
-
-#### Étape 6: Sauvegarde Liste Paquets
-
-```cpp
-// Sauvegarde la liste des paquets installés
