@@ -16,14 +16,14 @@ Two approaches:
 - high portability: distribution across different systems would be simplified
 - with minimal size Impact: after symbol stripping, the size increase would be approximately 600 KB to 1 MB I think. (to be verified)
 
-Since the application would only utilize the ISO creation API (xorrisofs/mkisofs emulation mode) and would not require the physical CD/DVD burning layer (libburn), modern compilers (GCC/Clang) should perform effective dead-code elimination, so unused library functions are excluded from the final binary, keeping the size overhead minimal.
+Since the application would only utilize the ISO creation API (xorrisofs/mkisofs emulation mode) and would not require the physical CD/DVD burning layer (libburn), modern compilers (GCC/Clang) should perform effective dead-code elimination, so unused library functions are excluded from the final binary, keeping the size overhead minimal. Only problem: I'm not so sure about the legal issues with this method.
 
 #### Alternative: dynamic linking
-dynamic linking could be maintained, which would simply introduce a standard shared library dependency (such as libisoburn1) in the distribution's package. This would be more traditional but would retain an external dependency...
+dynamic linking could be maintained, which would simply introduce a standard shared library dependency (such as libisoburn1) in the distribution's package. This would be more traditional but would retain an external dependency. Wee need to decide what's best.
 
 ---
 
-## 2. OverlayFS-Based snapshot generation
+## 2. OverlayFS-Based snapshot generation (Most important enhancement at my opinion)
 
 Now, we copy the entire system to a temporary directory before compression, this has several drawbacks:
 
@@ -69,14 +69,14 @@ The application would perform all necessary filesystem modifications directly wi
 Once staging phase is complete, mksquashfs would be executed directly against the merged directory, after compression finishes, the entire structure would be unmounted, leaving the host system completely untouched :-)
 This approach would offer fundamental improvements:
 
---- Simplicity for mksquashfs**
+--- Simplicity for mksquashfs:
    - the compression tool would receive a single, clean, virtual source directory
    - files would be processed transparently without complex multi-source inclusion syntax
-   - cleaner, more maintainable code
+   - cleaner, more maintainable code (ggod)
 
---- Total Isolation
+--- Total Isolation:
    -  0 risks of corrupting the host system during account sanitization or configuration phases
-   - all modifications isolated inside the virtual layer
+   - all modifications will be isolated inside the virtual layer
    - complete rollback capability by simply unmounting
 
 --- performance:
@@ -85,19 +85,18 @@ This approach would offer fundamental improvements:
 
 ### Note: non-SquashFS ISO components
 -  the root filesystem compression should be isolated from the rest of the ISO structure. Final ISO image requires additional boot assets that cannot be virtualized:
+ Bootloader (Isolinux/GRUB), linux kernel (vmlinuz) and initial ramdisk initrd
 
- Bootloader (Isolinux/GRUB), linux kernel (`vmlinuz`) and initial ramdisk (`initrd`)
-
-These standalone files typically represent only a few hundred megabytes in total. A traditional, physical copy of these specific files into a minimal temporary workspace (for example /tmp/s4-iso-root/live/) would still be necessary prior to the final ISO generation call of course, but their storage footprint would be negligible compared to the massive space savings achieved by eliminating the root directory duplication.
+These standalone files typically represent only ~ few hundred megabytes in total. A traditional, physical copy of these specific files into a minimal temporary workspace (for example /tmp/s4-iso-root/live/) would still be necessary prior to the final ISO generation call of course, but their storage footprint would be negligible compared to the massive space savings achieved by eliminating the root directory duplication.
 
 
-This approach would represent a significant architectural improvement, offering better performance, enhanced safety, and dramatically reduced resource consumption.
+This approach would represent a significant architectural improvement, offering better performance, enhanced safety, and will dramatically reduce resource consumption.
 ---
 
 
-Both enhancements are independent and could be implemented separately:
+both enhancements are independent and could be implemented separately:
 
-1. OverlayFS-based snapshot generation
+1. OverlayFS-based snapshot generation (most important)
    - Immediate, tangible benefits for all users, addresses current performance and resource limitations and modernizes the core workflow
 
 2. libisoburn integration
@@ -107,4 +106,4 @@ Both enhancements are independent and could be implemented separately:
 
 I think this would significantly improve S4 Snapshot Qt-free's efficiency, safety, and user experience, in particular the OverlayFS-based snapshot generation would represent a major advancement, bringing the application in line with modern system imaging best practices and improving reliability ;-)
 
-** Need your opinion on these two points, if ok, I can do it **
+** Q4OS Team, I need your opinion on these two points, if it's ok for you, I can do it **
