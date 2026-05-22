@@ -1,0 +1,15 @@
+#!/bin/bash
+#DEBHELPER#
+case "$1" in
+    purge|remove)
+      set +e
+      echo "Cancel diversion of Calamares launcher ..."
+      dpkg-divert --quiet --rename --remove /usr/bin/add-calamares-desktop-icon
+
+      # echo "Removing initrd_release ..."
+      # rm -f /etc/initrd_release
+    ;;
+
+    *)
+    ;;
+esac

@@ -1,0 +1,1832 @@
+s4-snapshot (26.03.2) mx; urgency=medium
+
+  * Save/restore window geometry
+
+ -- Adrian <adrian@local>  Mon, 16 Mar 2026 15:46:48 -0400
+
+s4-snapshot (26.03.1) mx; urgency=medium
+
+  * Add multi-init support
+
+ -- Adrian <adrian@local>  Sun, 15 Mar 2026 13:26:17 -0400
+
+s4-snapshot (26.03) mx; urgency=medium
+
+  * Replace shell-based helper with compiled C++ helper binary
+  * Show help and license in app window
+
+ -- Adrian <adrian@local>  Sun, 15 Mar 2026 00:18:42 -0400
+
+s4-snapshot (26.01.3) mx; urgency=medium
+
+  * Fix exclude size calc on sparse files
+
+ -- Adrian <adrian@local>  Tue, 13 Jan 2026 19:01:56 -0500
+
+s4-snapshot (26.01.2) mx; urgency=medium
+
+  * GUI: keep boot options after NVIDIA prompt
+  * Save log for iso-snapshot-cli too
+
+ -- Adrian <adrian@local>  Sat, 10 Jan 2026 21:59:03 -0500
+
+s4-snapshot (26.01.1) mx; urgency=medium
+
+  * Fix syntax error in cleanup function
+
+ -- Adrian <adrian@local>  Sat, 10 Jan 2026 10:36:43 -0500
+
+s4-snapshot (26.01) mx; urgency=medium
+
+  * CLI/GUI: backup exclusion file on reset
+  * Work with more than one location for installed-to-live
+
+ -- Adrian <adrian@local>  Mon, 05 Jan 2026 09:36:43 -0500
+
+s4-snapshot (25.12.12) mx; urgency=medium
+
+  * Fix exclude size double counting
+  * Avoid symlink glob dereference in excludes
+
+ -- Adrian <adrian@local>  Wed, 31 Dec 2025 17:37:38 -0500
+
+s4-snapshot (25.12.9) mx; urgency=medium
+
+  * Improve calculation of space on root and /home
+
+ -- Adrian <adrian@local>  Wed, 31 Dec 2025 01:02:25 -0500
+
+s4-snapshot (25.12.8) mx; urgency=medium
+
+  * Fix GUI/CLI space checks: check available space only after selecting
+    the snapshot directory in GUI
+
+ -- Adrian <adrian@local>  Sun, 28 Dec 2025 12:45:31 -0500
+
+s4-snapshot (25.12.6) mx; urgency=medium
+
+  * Remove exclusion /var/lib/sddm/ which will be handled by live-files
+    in s4-remaster
+
+ -- Adrian <adrian@local>  Tue, 23 Dec 2025 21:59:40 -0500
+
+s4-snapshot (25.12.5) mx; urgency=medium
+
+  * Improve cleanup safety and overlay handling
+  * Close app ifthe user doesn't elevate when requested
+  * Show debug sizes using 2-decimal MiB format
+
+ -- Adrian <adrian@local>  Sat, 20 Dec 2025 18:22:32 -0500
+
+s4-snapshot (25.12.2) mx; urgency=medium
+
+  * Add pop up to show that the maintainer excludes is newer than the
+    custom one. Add option for user to show diff, accept changes or
+    keep the custom list
+
+ -- Adrian <adrian@local>  Mon, 08 Dec 2025 10:14:38 -0500
+
+s4-snapshot (25.12) mx; urgency=medium
+
+  * Copy the exclusion list to the ~/.config/MX-Linux/ to allow users to
+    set their own list that will not be overwritten on updates
+  * Improve launching of editor for the exclude list
+  * Add custom exclude reset button
+
+ -- Adrian <adrian@local>  Mon, 08 Dec 2025 00:16:10 -0500
+
+s4-snapshot (25.11.2) mx; urgency=medium
+
+  * Added fallback path for the excludes file in case it's not found
+  * Changed allowed filesystems from allowed list to deny list, excluding file
+    systems known not to support POSIX permissions, this will allow some more
+    obscure Linux filesystem to be used
+
+ -- Adrian <adrian@local>  Wed, 19 Nov 2025 09:37:30 -0500
+
+s4-snapshot (25.11.1) mx; urgency=medium
+
+  * Add f2fs to the list of supported partitions
+
+ -- Adrian <adrian@local>  Mon, 17 Nov 2025 16:36:37 -0500
+
+s4-snapshot (25.11) mx; urgency=medium
+
+  * Updated config loading to sanitize the persisted cores value.
+  * Open grub.cfg and syslinux.cfg in addition to isolinux.cfg when edit_boot_menu = on
+
+ -- Adrian <adrian@local>  Fri, 07 Nov 2025 15:12:20 -0500
+
+s4-snapshot (25.10.1) mx; urgency=medium
+
+  * Fix: edit_boot_menu now honors the system setting by falling back to
+    /etc/s4-snapshot.conf when the user config lacks the key
+
+ -- Adrian <adrian@local>  Mon, 27 Oct 2025 09:02:04 -0400
+
+s4-snapshot (25.10) mx; urgency=medium
+
+  * Trim quotes when reading options
+  * Update translations
+
+ -- Adrian <adrian@local>  Wed, 01 Oct 2025 12:59:15 -0400
+
+s4-snapshot (25.09.2) mx; urgency=medium
+
+  * Use sudo for elevation in CLI mode; fix cleanup issue when
+    pkexec/gksu are not present
+
+ -- Adrian <adrian@local>  Wed, 10 Sep 2025 00:34:55 -0400
+
+s4-snapshot (25.09) mx; urgency=medium
+
+  * Fix log ownership
+  * Run in CLI automatically if windowing system is not detected
+  * Update translations
+
+ -- Adrian <adrian@local>  Tue, 09 Sep 2025 19:26:48 -0400
+
+s4-snapshot (25.6.01) mx; urgency=medium
+
+  * Fix: create directory before trying to link the file
+
+ -- Adrian <adrian@local>  Fri, 06 Jun 2025 23:36:31 -0400
+
+s4-snapshot (25.6) mx; urgency=medium
+
+  * Prepare to move stuff out of /usr/local/; Read script from alternative location
+
+ -- Adrian <adrian@local>  Fri, 06 Jun 2025 20:40:07 -0400
+
+s4-snapshot (25.4.01) mx; urgency=medium
+
+  * Update to Qt6
+
+ -- Adrian <adrian@local>  Thu, 24 Apr 2025 19:05:07 -0400
+
+s4-snapshot (25.4) mx; urgency=medium
+
+  * Adjust kmod and luks2 handling within copy-initrd-programs needed for trixie
+  * Add cryptsetup into initrd
+  * Make copy-initrd-programs shellcheck safe
+  * Add Debian release code names Trixie, Forky, and Duke to enum in settings
+
+ -- fehlix <fehlix@local>  Sun, 13 Apr 2025 17:31:38 -0400
+
+s4-snapshot (25.2) mx; urgency=medium
+
+  * Fix: allow some special characters in file names
+
+ -- Adrian <adrian@local>  Sun, 02 Feb 2025 18:49:33 -0500
+
+s4-snapshot (24.12.01) mx; urgency=medium
+
+  * revert changes to copy-initrd helper programs
+
+ -- Dolphin Oracle <dolphinoracle@gmail.com>  Mon, 30 Dec 2024 19:01:15 -0500
+
+s4-snapshot (24.12) mx; urgency=medium
+
+  * Add /var/log/journal/* to exclusion list
+  * Update translations
+
+ -- Adrian <adrian@local>  Sun, 22 Dec 2024 01:46:35 -0500
+
+s4-snapshot (24.9.03) mx; urgency=medium
+
+  * Fix string quoting for excludeFlatpak
+
+ -- Adrian <adrian@local>  Mon, 02 Sep 2024 18:49:57 -0400
+
+s4-snapshot (24.9.01) mx; urgency=medium
+
+  * Add exclude Flatpak option
+  * Fix: ignore error when reading xdg-user-dir output
+
+ -- Adrian <adrian@local>  Sun, 01 Sep 2024 22:12:04 -0400
+
+s4-snapshot (24.8.02) mx; urgency=medium
+
+  * Fix terminal output for progress bar and pulsing "Progress ..."
+  * Minor: replaced use of "column" with printf to avoid bsdextrautils
+    dependency
+
+ -- Adrian <adrian@local>  Thu, 15 Aug 2024 19:12:42 -0400
+
+s4-snapshot (24.8.01) mx; urgency=medium
+
+  * Use QCalendarWidget to select release date and combobox to select
+    the kernel
+
+ -- Adrian <adrian@local>  Wed, 14 Aug 2024 22:23:48 -0400
+
+s4-snapshot (24.8) mx; urgency=medium
+
+  * Add support for ext2 and zfs for temporary work directory
+  * Update translations
+
+ -- Adrian <adrian@local>  Mon, 05 Aug 2024 12:02:33 -0400
+
+s4-snapshot (24.7.03) mx; urgency=medium
+
+  * Remove the nvidia boot option that may have been added with a
+    previous snapshot
+
+ -- fehlix <fehlix@local>  Wed, 24 Jul 2024 13:35:06 -0400
+
+s4-snapshot (24.7.02) mx; urgency=medium
+
+  * Fix: run nvidia check only once and only if it xorg=nvidia is not
+    already added
+
+ -- Adrian <adrian@local>  Wed, 24 Jul 2024 13:35:06 -0400
+
+s4-snapshot (24.7.01) mx; urgency=medium
+
+  * Add prompt when detecting nvidia and add xorg=nvidia to kernel
+    options if the user plans to use the ISO on the same/similar
+    computer
+
+ -- Adrian <adrian@local>  Wed, 24 Jul 2024 07:33:17 -0400
+
+s4-snapshot (24.6) mx; urgency=medium
+
+  * Check whether linuxfs was copied to the ram during the live boot
+
+ -- fehlix <fehlix@local>  Wed, 05 Jun 2024 14:45:24 -0400
+
+s4-snapshot (24.5) mx; urgency=medium
+
+  * Run editor as user when editing exclusion file if the editor elevates
+    itself; added codium, removed atom from the list of possible editors
+  * Update translations
+
+ -- Adrian <adrian@local>  Fri, 24 May 2024 13:42:23 -0400
+
+s4-snapshot (24.4.02) mx; urgency=medium
+
+  * Skip display of default keyboard options bootparameter (kbopt)
+
+ -- fehlix <fehlix@local>  Thu, 18 Apr 2024 18:55:15 -0400
+
+s4-snapshot (24.4.01) mx; urgency=medium
+
+  * Update translations
+  * Minor: for monthly snapshot use default kernel options
+
+ -- Adrian <adrian@local>  Wed, 17 Apr 2024 19:24:18 -0400
+
+s4-snapshot (24.4) mx; urgency=medium
+
+  * Add system language, keyboard, timezon to boot parameter field
+  * Adjust exclusion list: live and ~/.cache/xfce4/clipman
+  * Change error message to direct user to log
+
+ -- Adrian <adrian@local>  Thu, 11 Apr 2024 16:49:08 -0400
+
+s4-snapshot (24.3.01) mx; urgency=medium
+
+  * Fix: for system that use different umask, set umask to 022 before running mksquashfs command
+
+ -- Adrian <adrian@local>  Sun, 17 Mar 2024 14:10:36 -0400
+
+s4-snapshot (24.3) mx; urgency=medium
+
+  * Fix: log creation
+
+ -- Adrian <adrian@local>  Sun, 17 Mar 2024 10:04:19 -0400
+
+s4-snapshot (24.02.04) mx; urgency=medium
+
+  * Faster exclusion checkbox selection
+  * Fix: doesn't exclude files twice when selecting Exclude All
+  * Slightly better calculation for the size of excluded files
+
+ -- Adrian <adrian@local>  Wed, 14 Feb 2024 02:04:49 -0500
+
+s4-snapshot (24.02.03) mx; urgency=medium
+
+  * Fix: write actual snapshot date/time creation to /etc/snapshot_created
+  * Fix: edit exclusion button opens the correct file
+
+ -- Adrian <adrian@local>  Mon, 12 Feb 2024 11:58:40 -0500
+
+s4-snapshot (24.02) mx; urgency=medium
+
+  * Edit config file for user instead of system
+
+ -- Adrian <adrian@local>  Sat, 10 Feb 2024 21:21:20 -0500
+
+s4-snapshot (24.01.01) mx; urgency=medium
+
+  * Add device mapper modules to avoid Ventoy crashes
+
+ -- fehlix <fehlix@local>  Sun, 28 Jan 2024 09:01:56 -0500
+
+s4-snapshot (23.12.02) mx; urgency=medium
+
+  * Add minimum width for number of cores box
+
+ -- Adrian <adrian@local>  Mon, 11 Dec 2023 23:00:41 -0500
+
+s4-snapshot (23.12.01) mx; urgency=medium
+
+  * Fix: quoting in sed replacement file path
+  * Use entryFileInfolist instead of iterator to avoid I/O timing issues
+
+ -- fehlix <fehlix@local>  Sat, 02 Dec 2023 20:09:10 -0500
+
+s4-snapshot (23.11.05) mx; urgency=medium
+
+  * Fix: more quoting to allow for spaces in snapshot directory
+
+ -- Adrian <adrian@local>  Tue, 28 Nov 2023 00:20:42 -0500
+
+s4-snapshot (23.11.04) mx; urgency=medium
+
+  * Fix: spaces in snapshot and working directory
+  * Fix: relative directory path in commandline arguments
+
+ -- fehlix <fehlix@local>  Mon, 27 Nov 2023 20:03:18 -0500
+
+s4-snapshot (23.11.03) mx; urgency=medium
+
+  * Fix: getting xdg-user-dir info
+
+ -- Adrian <adrian@local>  Fri, 17 Nov 2023 02:50:01 -0500
+
+s4-snapshot (23.11.02) mx; urgency=medium
+
+  * Unified builds for MX21 and MX23
+
+ -- Adrian <adrian@local>  Wed, 15 Nov 2023 16:59:48 -0500
+
+s4-snapshot (23.11.01) mx; urgency=medium
+
+  * Fix: use /home/user instead of /home for temp directory (this solves a permission issue)
+
+ -- Adrian <adrian@local>  Wed, 15 Nov 2023 16:14:41 -0500
+
+s4-snapshot (23.11) mx; urgency=medium
+
+  * Run program as normal user and elevate only when needed
+  * Prioritize user settings over system settings. Settings available in ~/.conf/MX-Linux/ directory
+  * Added -processors and -throttle options in the GUI and CLI arguments, see --help for CLI args
+        -- if you used to pass any of these options directly in .conf file might neet to remove those
+
+ -- Adrian <adrian@local>  Sat, 11 Nov 2023 19:42:42 -0500
+
+s4-snapshot (23.10.01) mx; urgency=medium
+
+  * Exclude ~/.config/MX-Linux/xdg_check to make sure default Desktop files (installer link) are recreated
+
+ -- Adrian <adrian@local>  Tue, 10 Oct 2023 12:49:43 -0400
+
+s4-snapshot (23.10) mx; urgency=medium
+
+  * Remove resume, hibernate, and checkmd5 from saved boot parameters
+  * Adjust debian rules clean: Remove compiled translations and compressed man pages from source
+
+ -- fehlix <fehlix@local>  Mon, 09 Oct 2023 04:56:22 -0400
+
+s4-snapshot (23.8) mx; urgency=medium
+
+  * Fix to make window fit lower resolution screens
+
+ -- Adrian <adrian@local>  Tue, 22 Aug 2023 17:37:48 -0400
+
+s4-snapshot (23.7.02) mx; urgency=medium
+
+  * Fix a couple of translations
+
+ -- Adrian <adrian@local>  Mon, 24 Jul 2023 15:10:39 -0400
+
+s4-snapshot (23.7.01) mx; urgency=medium
+
+  * Update translations
+
+ -- Adrian <adrian@local>  Thu, 20 Jul 2023 17:19:44 -0400
+
+s4-snapshot (23.7) mx; urgency=medium
+
+  [ fehlix ]
+  * Remove rootflags and init from saved bootparamter
+
+  [ Dolphin Oracle ]
+  * new build
+
+ -- Dolphin Oracle  <dolphinoracle@gmail.com>  Mon, 03 Jul 2023 19:12:11 -0500
+
+s4-snapshot (23.6) mx; urgency=medium
+
+  * Improve file editor detection (for editing exclusion file)
+  * Refresh translations
+
+ -- Adrian <adrian@local>  Sun, 18 Jun 2023 22:59:13 -0400
+
+s4-snapshot (23.5.05) mx; urgency=medium
+
+  * Fix to handle empty resulting boot parameter list
+
+ -- Adrian <adrian@local>  Mon, 22 May 2023 08:02:01 -0400
+
+s4-snapshot (23.5.04) mx; urgency=medium
+
+  * Addjust bootparmeter list
+  * Add icon to polkit-policy
+
+ -- Adrian <adrian@local>  Sun, 21 May 2023 13:47:51 -0400
+
+s4-snapshot (23.5.03) mx; urgency=medium
+
+  * Fix path snapshot-bootparameter.sh
+  * Don't exclude live_swap=off
+
+ -- Adrian <adrian@local>  Sun, 21 May 2023 12:00:59 -0400
+
+s4-snapshot (23.5.02) mx; urgency=medium
+
+  * Use snapshot-bootparameter.sh script to get a list of kernel options
+
+ -- Adrian <adrian@local>  Thu, 18 May 2023 22:15:02 -0400
+
+s4-snapshot (23.5.01) mx; urgency=medium
+
+  * Update logo
+
+ -- Adrian <adrian@local>  Thu, 18 May 2023 00:08:21 -0400
+
+s4-snapshot (23.5) mx; urgency=medium
+
+  * Update icon
+  * Refresh translations
+
+ -- Adrian <adrian@local>  Sun, 14 May 2023 22:19:34 -0400
+
+s4-snapshot (23.4.01) mx; urgency=medium
+
+  * Fix iso-snapshot-cli-exclude.list link
+
+ -- Adrian <adrian@local>  Wed, 19 Apr 2023 16:44:03 -0400
+
+s4-snapshot (23.4) mx; urgency=medium
+
+  * Update icon
+  * Update translations
+
+ -- Adrian <adrian@local>  Thu, 13 Apr 2023 23:52:41 -0400
+
+s4-snapshot (23.3.03) mx; urgency=medium
+
+  * Remove resume, resume_offset, and cryptsetup from kernel options
+
+ -- Adrian <adrian@local>  Wed, 22 Mar 2023 10:27:02 -0400
+
+s4-snapshot (23.3.02) mx; urgency=medium
+
+  * Exclude swap file(s)
+
+ -- Adrian <adrian@local>  Tue, 21 Mar 2023 19:37:35 -0400
+
+s4-snapshot (23.3.01) mx; urgency=medium
+
+  * Exclude /root/.cache by default
+  * Minor fix for monthly snapshot build helper
+  * Make sure GUI is active while displaying help
+
+ -- Adrian <adrian@local>  Thu, 16 Mar 2023 23:46:25 -0400
+
+s4-snapshot (23.3) mx; urgency=medium
+
+  * Add option to change the default live kernel
+
+ -- Adrian <adrian@local>  Wed, 08 Mar 2023 22:48:00 -0500
+
+s4-snapshot (23.2.04) mx; urgency=medium
+
+  * Copy /etc/initrd_release into live initrd if exist
+  * Add periodic update- and anacron-stamp to exclusion list
+  * Add more browser cache and history files to exclusion list
+  * Use C locale to determine free memory
+
+ -- fehlix <fehlix@local>  Mon, 27 Feb 2023 10:46:11 -0500
+
+s4-snapshot (23.2.03) mx; urgency=medium
+
+  * If using a ramfs as a workdir, use available RAM instead of having to run with -o/--override-size
+
+ -- Adrian <adrian@local>  Fri, 24 Feb 2023 22:08:15 -0500
+
+s4-snapshot (23.2.02) mx; urgency=medium
+
+  * Fixed translations
+
+ -- Adrian <adrian@local>  Thu, 23 Feb 2023 08:40:03 -0500
+
+s4-snapshot (23.2.01) mx; urgency=medium
+
+  * Allow to put workdir in tmpfs or ramfs
+  * -- For ramfs you need to pass -o/--override-size because ramfs grows dynamically
+
+ -- Adrian <adrian@local>  Wed, 22 Feb 2023 10:27:12 -0500
+
+s4-snapshot (23.2) mx; urgency=medium
+
+  * Add -w/--workdir option
+  * Update translations
+
+ -- Adrian <adrian@local>  Sun, 19 Feb 2023 13:53:25 -0500
+
+s4-snapshot (23.1.01) mx; urgency=medium
+
+  * Better handling if /etc/lsb-release is missing
+
+ -- Adrian <adrian@local>  Wed, 18 Jan 2023 00:59:14 -0500
+
+s4-snapshot (23.1) mx; urgency=medium
+
+  * New translations
+
+ -- Adrian <adrian@local>  Mon, 16 Jan 2023 19:59:39 -0500
+
+s4-snapshot (22.12.04) mx; urgency=medium
+
+  * Update copy-initrd-programs for luks2, see cli-shell-utils changelog
+
+ -- Adrian <adrian@local>  Tue, 27 Dec 2022 22:20:27 -0500
+
+s4-snapshot (22.12.03) mx; urgency=medium
+
+  * Fix: finding system editor
+
+ -- Adrian <adrian@local>  Tue, 20 Dec 2022 07:26:41 -0500
+
+s4-snapshot (22.12.02) mx; urgency=medium
+
+  * Fix: remove linefeed from cmdline boot parameter
+  * Do not save build-in kernel parameter
+
+ -- fehlix <fehlix@local>  Wed, 07 Dec 2022 17:38:50 -0500
+
+s4-snapshot (22.12.01) mx; urgency=medium
+
+  * Fix: set application display name
+
+ -- Adrian <adrian@local>  Sat, 03 Dec 2022 12:02:24 -0500
+
+s4-snapshot (22.12) mx; urgency=medium
+
+  * Read booted kernel options and set them as default when creating a snapshot
+
+ -- Adrian <adrian@local>  Sat, 03 Dec 2022 00:06:10 -0500
+
+s4-snapshot (22.11) mx; urgency=medium
+
+  * Add compressed kernel-modules handling. A s4-iso-template update is also required for this feature
+
+ -- Adrian <adrian@local>  Mon, 28 Nov 2022 18:26:08 -0500
+
+s4-snapshot (22.10.05) mx; urgency=medium
+
+  * Add custom boot options directly to GRUB menu
+
+ -- Adrian <adrian@local>  Sun, 30 Oct 2022 19:37:17 -0400
+
+s4-snapshot (22.10.04) mx; urgency=medium
+
+  * Fix quoting for name/description strings
+
+ -- Adrian <adrian@local>  Sun, 30 Oct 2022 10:32:39 -0400
+
+s4-snapshot (22.10.03) mx; urgency=medium
+
+  * Update /etc/mx-version and /etc/lsb-release files with the provided info
+
+ -- Adrian <adrian@local>  Sat, 29 Oct 2022 13:21:48 -0400
+
+s4-snapshot (22.10.02) mx; urgency=medium
+
+  ^ Execute a sync before automatic shutdown
+
+ -- Adrian <adrian@local>  Sat, 29 Oct 2022 07:47:56 -0400
+
+s4-snapshot (22.10.01) mx; urgency=medium
+
+  * Make it possible to select different checksum, not all or nothing
+  * Provide more info about compression algorithms
+  * Remove code targetting versions < Stretch
+  * Add optional customization for name of the project, version, date, codename, boot options
+
+ -- Adrian <adrian@local>  Sat, 29 Oct 2022 00:53:23 -0400
+
+s4-snapshot (22.10) mx; urgency=medium
+
+  * translation refresh
+
+ -- Dolphin Oracle <dolphinoracle@gmail.com>  Wed, 26 Oct 2022 20:07:26 -0400
+
+s4-snapshot (22.9.02) mx; urgency=medium
+
+  * Revert untested code that was creating some issues
+
+ -- Adrian <adrian@local>  Fri, 09 Sep 2022 08:52:10 -0400
+
+s4-snapshot (22.9.01) mx; urgency=medium
+
+  * Fix calculating md5sum for linuxfs file
+
+ -- Adrian <adrian@local>  Thu, 08 Sep 2022 16:15:36 -0400
+
+s4-snapshot (22.9) mx; urgency=medium
+
+  * Add exclusion for ~/.local/share/Steam (for Steam package install from steampowered.com)
+
+ -- Adrian <adrian@local>  Wed, 07 Sep 2022 11:45:51 -0400
+
+s4-snapshot (22.8.03) mx; urgency=medium
+
+  * update hyper-v initrd modules
+
+ -- fehlix <fehlix@local>  Wed, 31 Aug 2022 16:32:30 -0400
+
+s4-snapshot (22.8.02) mx; urgency=medium
+
+  * Adds a shutdown when done option (checkbox before starting in GUI and --shutdown CLI option)
+
+ -- Adrian <adrian@local>  Tue, 23 Aug 2022 19:14:05 -0400
+
+s4-snapshot (22.8.01) mx; urgency=medium
+
+  * Use gio open instead of xdg-open to open documents
+
+ -- Adrian <adrian@local>  Mon, 22 Aug 2022 12:34:16 -0400
+
+s4-snapshot (22.8) mx; urgency=medium
+
+  * Fix: launching Firefox from Help
+  * Translation update
+
+ -- Adrian <adrian@local>  Wed, 17 Aug 2022 16:41:43 -0400
+
+s4-snapshot (22.7) mx; urgency=medium
+
+  * translation update
+
+ -- Dolphin Oracle <dolphinoracle@gmail.com>  Sat, 23 Jul 2022 12:30:30 -0400
+
+s4-snapshot (22.6.02) mx; urgency=medium
+
+  *  Fix: don't remove all exclusions when Exclude all is toggled off when one of the exclusions is removed
+
+ -- Adrian <adrian@local>  Sat, 18 Jun 2022 12:21:56 -0400
+
+s4-snapshot (22.6.01) mx; urgency=medium
+
+  * Fix resetting accounts/respin mode
+
+ -- Adrian <adrian@local>  Wed, 15 Jun 2022 19:05:55 -0400
+
+s4-snapshot (22.6) mx; urgency=medium
+
+  * Preserve user theme when launching program as root
+  * Make sure HOME and XDG_RUNTIME_DIR are correct when launching as root
+
+ -- Adrian <adrian@local>  Mon, 13 Jun 2022 10:32:02 -0400
+
+s4-snapshot (22.4.01) mx; urgency=medium
+
+  * Make sure the output text is added at the end of output box (clicking inside the output box should not more the cursor arround and clobber text)
+  * Don't run runuser command inside a login shell; it can create problems if user has scripts that output text at login
+
+ -- Adrian <adrian@local>  Sat, 16 Apr 2022 17:54:54 -0400
+
+s4-snapshot (22.4) mx; urgency=medium
+
+  * Check if output file already exits and ask user to change the name or remove the existent file.
+  * Unbuffer mksqashfs if ran from CLI and if 'expect' package is installed.
+  * Preserve /var/log/apache2 to make sure Apache starts.
+  * Add option to man page.
+
+ -- Adrian <adrian@local>  Tue, 12 Apr 2022 13:57:36 -0400
+
+s4-snapshot (22.3.01) mx; urgency=medium
+
+  * Minor: change system size info file name.
+
+ -- Adrian <adrian@local>  Sat, 12 Mar 2022 19:15:37 -0500
+
+s4-snapshot (22.3) mx; urgency=medium
+
+  * Save file system size info in a file under /antiX/ folder to be used by installer
+
+ -- Adrian <adrian@local>  Sat, 12 Mar 2022 14:54:20 -0500
+
+s4-snapshot (22.2.05) mx; urgency=medium
+
+  * Fix missing blank space when searching for editor
+
+ -- Adrian <adrian@local>  Fri, 18 Feb 2022 17:41:29 -0500
+
+s4-snapshot (22.2.04) mx; urgency=medium
+
+  * Add option to specify temporary work directory in /etc/s4-snapshot.conf file
+  *   for example: workdir=/tmp, program will check if the folder exits and if it's
+  *   the right partition type (only partitions that allow bind mounts can work)
+  * Updated s4-snapshot.conf file format to make sure comments are not lost when
+  *   writing back to file
+
+ -- Adrian <adrian@local>  Wed, 16 Feb 2022 22:16:00 -0500
+
+s4-snapshot (22.2.03) mx; urgency=medium
+
+  * Fix displaying critical error regarding missing compression algorithm in kernel
+  * Improve text editor detection
+
+ -- Adrian <adrian@local>  Sat, 12 Feb 2022 00:22:55 -0500
+
+s4-snapshot (22.2.02) mx; urgency=medium
+
+  * Fix starting editor
+
+ -- Adrian <adrian@local>  Sat, 05 Feb 2022 16:05:53 -0500
+
+s4-snapshot (22.2.01) mx; urgency=medium
+
+  * Fix starting krite/kate as normal users when editing exlusion file
+
+ -- Adrian <adrian@local>  Sat, 05 Feb 2022 13:29:48 -0500
+
+s4-snapshot (22.2) mx; urgency=medium
+
+  * Add Steam (~/.steam) and VirtualBox folders exclusion options
+
+ -- Adrian <adrian@local>  Fri, 04 Feb 2022 16:38:45 -0500
+
+s4-snapshot (21.9.01) mx; urgency=medium
+
+  * Fix: don't create /etc/skel/Desktop when not needed
+
+ -- Adrian <adrian@local>  Sat, 25 Sep 2021 11:36:30 -0400
+
+s4-snapshot (21.9) mx; urgency=medium
+
+  * Make sure Installer icon shows on desktop in Plasma
+
+ -- Adrian <adrian@local>  Sat, 25 Sep 2021 00:19:25 -0400
+
+s4-snapshot (21.8) mx; urgency=medium
+
+  * Improve free space detection: move work_dir to a different partition if needed and possible
+
+ -- Adrian <adrian@local>  Mon, 23 Aug 2021 00:08:22 -0400
+
+s4-snapshot (21.7.01) mx; urgency=medium
+
+  * Add --compression-level CLI option
+  * Make zstd default for monthly snapshots
+
+ -- Adrian <adrian@local>  Sat, 31 Jul 2021 16:55:35 -0400
+
+s4-snapshot (21.7) mx; urgency=medium
+
+  * Add ZSTD compression support
+
+ -- Adrian <adrian@local>  Sun, 25 Jul 2021 20:51:41 -0400
+
+s4-snapshot (21.6.02) mx; urgency=medium
+
+  * adjust config file token replacement
+
+ -- fehlix <fehlix@local>  Tue, 29 Jun 2021 17:41:06 +0000
+
+s4-snapshot (21.6.01) mx; urgency=medium
+
+  * Fix: calculating occupied size when running live
+
+ -- Adrian <adrian@local>  Tue, 15 Jun 2021 02:23:07 -0400
+
+s4-snapshot (21.6) mx; urgency=medium
+
+  * Add --override-size/-o option to skip calculating free spece
+
+ -- Adrian <adrian@local>  Fri, 04 Jun 2021 18:59:18 -0400
+
+s4-snapshot (21.3.02) mx; urgency=medium
+
+  * fix: make it more clear that the snapshot is done
+
+ -- Adrian <adrian@local>  Sat, 20 Mar 2021 12:06:55 -0400
+
+s4-snapshot (21.3.01) mx; urgency=medium
+
+  * fix translation problem
+
+ -- Adrian <adrian@local>  Tue, 02 Mar 2021 17:36:03 -0500
+
+s4-snapshot (21.3) mx; urgency=medium
+
+  * don't copy it /etc/skel if xdg-user-dirs-update.real exists
+
+ -- Adrian <adrian@local>  Mon, 01 Mar 2021 20:13:28 -0500
+
+s4-snapshot (21.2.01) mx; urgency=medium
+
+  * add man page
+
+ -- Adrian <adrian@local>  Wed, 24 Feb 2021 19:04:48 -0500
+
+s4-snapshot (21.2) mx; urgency=medium
+
+  * fix: use regular expression to remove /snapshot name
+
+ -- Adrian <adrian@local>  Mon, 01 Feb 2021 11:27:48 -0500
+
+s4-snapshot (21.1.04) mx; urgency=medium
+
+  * fix: size conversion
+
+ -- Adrian <adrian@local>  Sun, 31 Jan 2021 15:46:40 -0500
+
+s4-snapshot (21.1.03) mx; urgency=medium
+
+  * make sure to add "/snapshot" to the snapshot dir
+
+ -- Adrian <adrian@local>  Sun, 31 Jan 2021 13:05:48 -0500
+
+s4-snapshot (21.1.02) mx; urgency=medium
+
+  * update copy-initrd-modules
+
+ -- Adrian <adrian@local>  Tue, 26 Jan 2021 22:02:39 -0500
+
+s4-snapshot (21.1.01) mx; urgency=medium
+
+  * Fix select location button
+
+ -- Adrian <adrian@local>  Sat, 23 Jan 2021 22:07:15 -0500
+
+s4-snapshot (21.1) mx; urgency=medium
+
+  * rewrite to allow CLI/scripted mode, use -h to list options
+  * catch SIGINT, SIGTERM, SIGHUP and cleanup before closing
+  * check if enough space on partition (for /root, for now it ignores /home)
+
+ -- Adrian <adrian@local>  Sun, 17 Jan 2021 12:01:32 -0500
+
+s4-snapshot (20.12.02) mx; urgency=medium
+
+  * add -k/--kernel option to take a snapshot with a different kernel
+
+ -- Adrian <adrian@local>  Thu, 31 Dec 2020 18:19:03 -0500
+
+s4-snapshot (20.12.01) mx; urgency=medium
+
+  * add checksum checkbox option
+  * take ownership for snapshot folder and resulting files
+  * some code fixes
+
+ -- Adrian <adrian@local>  Sat, 26 Dec 2020 10:15:39 -0500
+
+s4-snapshot (20.12) mx; urgency=medium
+
+  * adjust checksum generation for preempt_rt kernel
+
+ -- fehlix <fehlix@local>  Tue, 01 Dec 2020 20:56:40 -0400
+
+s4-snapshot (20.11) mx; urgency=medium
+
+  * new copy-initrd-modules
+
+ -- Adrian <adrian@local>  Tue, 17 Nov 2020 15:36:05 -0500
+
+s4-snapshot (20.10.2) mx; urgency=medium
+
+  * updated translations
+
+ -- Adrian <adrian@local>  Sun, 25 Oct 2020 18:41:43 -0400
+
+s4-snapshot (20.10.1) mx; urgency=medium
+
+  * add more network manager storage locations
+
+ -- Adrian <adrian@local>  Tue, 20 Oct 2020 19:28:28 -0400
+
+s4-snapshot (20.10) mx; urgency=medium
+
+  * exclude ~/.cache/thumbnails
+  * add exclude Network configurations checkbox in GUI
+  * improve editor selection
+
+ -- Adrian <adrian@local>  Mon, 19 Oct 2020 16:43:50 -0400
+
+s4-snapshot (20.6) mx; urgency=medium
+
+  * fix folder quoting
+
+ -- Adrian <adrian@local>  Sat, 06 Jun 2020 01:06:07 -0400
+
+s4-snapshot (20.4.1) mx; urgency=medium
+
+  * fix localized folder selection for multiple users >2
+
+ -- Adrian <adrian@local>  Wed, 29 Apr 2020 17:06:03 -0400
+
+s4-snapshot (20.4) mx; urgency=medium
+
+  * replace su with runuser
+
+ -- Adrian <adrian@local>  Fri, 24 Apr 2020 15:31:00 -0400
+
+s4-snapshot (20.3) mx; urgency=medium
+
+  * add /etc/snapshot_created with date of creation
+
+ -- Adrian <adrian@mx>  Thu, 12 Mar 2020 01:09:26 -0400
+
+s4-snapshot (20.2) mx; urgency=medium
+
+  * update copy-initrd-modules
+
+ -- Adrian <adrian@local>  Sun, 02 Feb 2020 12:13:29 -0500
+
+s4-snapshot (20.1) mx; urgency=medium
+
+  * adjust permission on minstall.desktop to remove lock emblem when on desktop
+
+ -- Adrian <adrian@local>  Mon, 13 Jan 2020 20:45:34 -0500
+
+s4-snapshot (19.12.02) mx; urgency=medium
+
+  * fix: mv and grep location in main.cpp
+
+ -- Adrian <adrian@local>  Fri, 13 Dec 2019 09:56:35 -0500
+
+s4-snapshot (19.12.01) mx; urgency=medium
+
+  * use relative location for grep,cat,sed,su,etc for Stretch
+
+ -- Adrian <adrian@local>  Thu, 12 Dec 2019 21:35:22 -0500
+
+s4-snapshot (19.12) mx; urgency=medium
+
+  * faster used space estimation in live environment
+
+ -- Adrian <adrian@local>  Tue, 10 Dec 2019 13:00:33 -0500
+
+s4-snapshot (19.10.04) mx; urgency=medium
+
+  * check using trailing slash too
+
+ -- Adrian <adrian@local>  Wed, 30 Oct 2019 10:00:00 -0400
+
+s4-snapshot (19.10.03) mx; urgency=medium
+
+  * fix check for misconfigured xdg-user-dir
+
+ -- Adrian <adrian@local>  Wed, 30 Oct 2019 08:13:18 -0400
+
+s4-snapshot (19.10.02) mx; urgency=medium
+
+  * fix folder exclusion in /home
+
+ -- Adrian <adrian@local>  Wed, 23 Oct 2019 03:30:48 -0400
+
+s4-snapshot (19.10.01) mx; urgency=medium
+
+  * update location exclude file
+
+ -- Adrian <adrian@local>  Sun, 13 Oct 2019 15:09:28 -0400
+
+s4-snapshot (19.10) mx; urgency=medium
+
+  * exclude minstall.conf for generic snapshots
+  * remove libcmd dependency
+  * show mkquashfs progress bar in a line
+
+ -- Adrian <adrian@local>  Sun, 06 Oct 2019 09:44:39 -0400
+
+s4-snapshot (19.9) mx; urgency=medium
+
+  * fix: trim characters when testing if xdg-user-dir returns useful info
+
+ -- Adrian <adrian@local>  Sun, 15 Sep 2019 17:40:39 -0400
+
+s4-snapshot (19.8.4) mx; urgency=medium
+
+  * added compression settings dropdown
+  * removed "edit configuration file" button
+
+ -- Adrian <adrian@local>  Sat, 31 Aug 2019 23:12:10 -0400
+
+s4-snapshot (19.8.3) mx; urgency=medium
+
+  * fix: allow about/help to run while calculating space used by system
+
+ -- Adrian <adrian@local>  Sat, 31 Aug 2019 12:26:39 -0400
+
+s4-snapshot (19.8.2) mx; urgency=medium
+
+  * update modules list in copy-initrd-modules
+
+ -- Adrian <adrian@local>  Sat, 24 Aug 2019 03:01:39 -0400
+
+s4-snapshot (19.8.1) mx; urgency=medium
+
+  * added offline help file
+
+ -- Adrian <adrian@local>  Wed, 21 Aug 2019 15:21:04 -0400
+
+s4-snapshot (19.8) mx; urgency=medium
+
+  * change to make it compatible with Buster base
+
+ -- Adrian <adrian@local>  Sun, 11 Aug 2019 21:54:28 -0400
+
+s4-snapshot (19.7.3) mx; urgency=medium
+
+  * revised modules
+
+ -- Adrian <adrian@local>  Tue, 16 Jul 2019 00:22:42 -0400
+
+s4-snapshot (19.7.2) mx; urgency=medium
+
+  * new icon
+
+ -- Adrian <adrian@local>  Mon, 08 Jul 2019 14:33:21 -0400
+
+s4-snapshot (19.7.1) mx; urgency=medium
+
+  * fix window buttons for Buster
+
+ -- Adrian <adrian@local>  Sun, 07 Jul 2019 14:02:03 -0400
+
+s4-snapshot (19.7) mx; urgency=medium
+
+  * exclude timeshift folders
+
+ -- Adrian <adrian@local>  Mon, 01 Jul 2019 14:39:20 -0400
+
+s4-snapshot (19.5.2) mx; urgency=medium
+
+  * updated copy-initrd-modules
+
+ -- Adrian <adrian@local>  Mon, 20 May 2019 18:00:51 -0400
+
+s4-snapshot (19.5.1) mx; urgency=medium
+
+  * added a couple of syncs to make sure the files are fully written before checksum is calculated
+
+ -- Adrian <adrian@local>  Tue, 14 May 2019 16:30:15 -0400
+
+s4-snapshot (19.5) mx; urgency=medium
+
+  * use monospace font in output box
+
+ -- Adrian <adrian@local>  Tue, 07 May 2019 17:13:00 -0400
+
+s4-snapshot (19.4.3) mx; urgency=medium
+
+  * updated translations
+
+ -- Adrian <adrian@local>  Wed, 24 Apr 2019 15:11:37 -0400
+
+s4-snapshot (19.4.2) mx; urgency=medium
+
+  * fix help file URL
+
+ -- Adrian <adrian@local>  Sun, 21 Apr 2019 17:49:45 -0400
+
+s4-snapshot (19.4.1) mx; urgency=medium
+
+  * fix trailing space in exclusion file
+
+ -- Adrian <adrian@local>  Mon, 08 Apr 2019 09:54:58 -0400
+
+s4-snapshot (19.4) mx; urgency=medium
+
+  * updated translations
+
+ -- Adrian <adrian@local>  Fri, 05 Apr 2019 11:53:17 -0400
+
+s4-snapshot (19.3.2) mx; urgency=medium
+
+  * check for compression support in kernel
+
+ -- Adrian <adrian@local>  Tue, 26 Mar 2019 23:57:33 -0400
+
+s4-snapshot (19.3.1) mx; urgency=medium
+
+  * exclude home directory for other localized users
+
+ -- Adrian <adrian@local>  Sat, 23 Mar 2019 00:58:20 -0400
+
+s4-snapshot (19.3) mx; urgency=medium
+
+  * fix running cleanup script twice
+
+ -- Adrian <adrian@local>  Mon, 18 Mar 2019 11:35:26 -0400
+
+s4-snapshot (19.2.1) mx; urgency=medium
+
+  * mount bind /boot if on separate partition
+
+ -- Adrian <adrian@local>  Tue, 12 Feb 2019 10:39:15 -0500
+
+s4-snapshot (19.2) mx; urgency=medium
+
+  * build EFI bootable image
+
+ -- Adrian <adrian@local>  Wed, 06 Feb 2019 14:03:37 -0500
+
+s4-snapshot (19.1.3) mx; urgency=medium
+
+  * add make-efi-img script
+
+ -- Adrian <adrian@local>  Sun, 27 Jan 2019 13:29:03 -0500
+
+s4-snapshot (19.1.2) mx; urgency=medium
+
+  * add vmd to copy-initrd-modules
+
+ -- Adrian <adrian@local>  Tue, 22 Jan 2019 20:06:36 -0500
+
+s4-snapshot (19.1.1) mx; urgency=medium
+
+  * exclude /etc/machine-id
+  * exclude /var/lib/NetworkManager/*
+
+ -- Adrian <adrian@local>  Fri, 18 Jan 2019 11:09:29 -0500
+
+s4-snapshot (19.1) mx; urgency=medium
+
+  * update exclusion list to not exclude /boot/grub/themes
+
+ -- Adrian <adrian@local>  Fri, 04 Jan 2019 08:41:48 -0500
+
+s4-snapshot (18.12.3) mx; urgency=medium
+
+  * copy modules change
+
+ -- Adrian <adrian@local>  Mon, 10 Dec 2018 11:58:09 -0500
+
+s4-snapshot (18.12.2) mx; urgency=medium
+
+  * adjust exclusions
+
+ -- Adrian <adrian@local>  Mon, 10 Dec 2018 09:20:45 -0500
+
+s4-snapshot (18.12.1) mx; urgency=medium
+
+  * make featherpad default editor, set nano as fallback
+
+ -- Adrian <adrian@local>  Tue, 04 Dec 2018 22:41:58 -0500
+
+s4-snapshot (18.12) mx; urgency=medium
+
+  * fix quotation, might solve installer icon missing on Desktop
+
+ -- Adrian <adrian@local>  Tue, 04 Dec 2018 17:12:25 -0500
+
+s4-snapshot (18.11.2) mx; urgency=medium
+
+  * exclude /etc/X11/xorg.conf.d/20-amd.conf
+
+ -- Adrian <adrian@local>  Fri, 30 Nov 2018 15:41:51 -0500
+
+s4-snapshot (18.11.1) mx; urgency=medium
+
+  * exclude encryption files
+
+ -- Adrian <adrian@local>  Wed, 28 Nov 2018 22:10:30 -0500
+
+s4-snapshot (18.11) mx; urgency=medium
+
+  * create sha512 sum
+  * added -m "Month" option, convenience shortcut for Monthly snapshot
+
+ -- Adrian <adrian@local>  Thu, 15 Nov 2018 16:58:25 -0500
+
+s4-snapshot (18.10) mx; urgency=medium
+
+  * updated translations
+
+ -- Adrian <adrian@local>  Sun, 14 Oct 2018 20:08:06 -0400
+
+s4-snapshot (18.9.1) mx; urgency=medium
+
+  * allow writing environment to NTFS partitions
+
+ -- Adrian <adrian@local>  Sat, 22 Sep 2018 18:10:26 -0400
+
+s4-snapshot (18.9) mx; urgency=medium
+
+  * use default editor if the editor is set in .conf file is absent
+
+ -- Adrian <adrian@local>  Mon, 17 Sep 2018 17:44:00 -0400
+
+s4-snapshot (18.8.4) mx; urgency=medium
+
+  * select larger / or /home for work folder
+  * add work folder exclusion
+
+ -- Adrian <adrian@local>  Mon, 13 Aug 2018 21:34:34 -0400
+
+s4-snapshot (18.8.3) mx; urgency=medium
+
+  * enable saving snapshot to NTFS and FAT32 partitions
+
+ -- Adrian <adrian@local>  Sun, 12 Aug 2018 16:36:33 -0400
+
+s4-snapshot (18.8.2) mx; urgency=medium
+
+  * fix icon other themes
+
+ -- Adrian <adrian@local>  Sat, 11 Aug 2018 22:55:49 -0400
+
+s4-snapshot (18.8.1) mx; urgency=medium
+
+  * fix cleanup if canceled
+
+ -- Adrian <adrian@local>  Sat, 11 Aug 2018 01:09:29 -0400
+
+s4-snapshot (18.8) mx; urgency=medium
+
+  * minor fix: progress bar
+
+ -- Adrian <adrian@local>  Sat, 04 Aug 2018 23:29:04 -0400
+
+s4-snapshot (18.6.1) mx; urgency=medium
+
+  * use libcmd to run shell commands
+  * added changelog button
+  * added /var/log/s4-snapshot.log
+
+ -- Adrian <adrian@local>  Wed, 27 Jun 2018 17:29:54 -0400
+
+s4-snapshot (18.6) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Mon, 18 Jun 2018 17:34:20 -0400
+
+s4-snapshot (18.5) mx; urgency=medium
+
+  * exclude user directories set in other languages
+
+ -- Adrian <adrian@local>  Thu, 24 May 2018 08:18:11 -0400
+
+s4-snapshot (18.3+2) mx; urgency=medium
+
+  * copy Installer.desktop only if force_installer=true
+
+ -- Adrian <adrian@local>  Mon, 26 Mar 2018 13:52:20 -0400
+
+s4-snapshot (18.3+1) mx; urgency=medium
+
+  * add option to force installation of installer
+
+ -- Adrian <adrian@local>  Mon, 19 Mar 2018 13:38:27 -0400
+
+s4-snapshot (18.3) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Fri, 02 Mar 2018 11:41:14 -0500
+
+s4-snapshot (18.2) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Sat, 10 Feb 2018 02:21:09 -0500
+
+s4-snapshot (18.01) mx; urgency=medium
+
+  * update copy-initrd scripts
+
+ -- Adrian <adrian@local>  Sun, 14 Jan 2018 19:15:22 -0500
+
+s4-snapshot (17.12) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Mon, 04 Dec 2017 15:09:47 -0500
+
+s4-snapshot (17.11+2) mx; urgency=medium
+
+  * fix LANG detection
+
+ -- Adrian <adrian@local>  Sat, 11 Nov 2017 18:49:18 -0500
+
+s4-snapshot (17.11+1) mx; urgency=medium
+
+  * add FR help
+
+ -- Adrian <adrian@local>  Fri, 10 Nov 2017 11:06:49 -0500
+
+s4-snapshot (17.11) mx; urgency=medium
+
+  * exclude localhost only for generalized snapshot
+
+ -- Adrian <adrian@local>  Wed, 01 Nov 2017 15:14:13 -0400
+
+s4-snapshot (17.10) mx; urgency=medium
+
+  * exclude /etc/localhost if link
+
+ -- Adrian <adrian@local>  Sat, 21 Oct 2017 09:57:44 -0400
+
+s4-snapshot (17.9.2) mx; urgency=medium
+
+  * fix replacing custom strings
+
+ -- Adrian <adrian@local>  Sat, 30 Sep 2017 12:13:37 -0400
+
+s4-snapshot (17.9.1) mx; urgency=medium
+
+  * replace release number and code name in menus
+
+ -- Adrian <adrian@local>  Sat, 30 Sep 2017 01:00:19 -0400
+
+s4-snapshot (17.9) mx; urgency=medium
+
+  * preparing package for MX17
+
+ -- Adrian <adrian@local>  Sat, 02 Sep 2017 12:59:28 -0400
+
+s4-snapshot (17.6mx16+1) mx; urgency=medium
+
+  * added exclusion for network connections
+
+ -- Adrian <adrian@local>  Fri, 23 Jun 2017 12:03:31 -0400
+
+s4-snapshot (17.6mx16) mx; urgency=medium
+
+  * updated translations
+
+ -- Adrian <adrian@local>  Fri, 02 Jun 2017 15:05:27 -0400
+
+s4-snapshot (17.5mx16+1) mx; urgency=medium
+
+  * updated translations
+
+ -- Adrian <adrian@local>  Thu, 11 May 2017 23:19:14 -0400
+
+s4-snapshot (17.5mx16) mx; urgency=medium
+
+  * update icons
+
+ -- Adrian <adrian@local>  Wed, 10 May 2017 15:37:05 -0400
+
+s4-snapshot (17.4mx16) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Wed, 26 Apr 2017 09:54:43 -0400
+
+s4-snapshot (17.2mx16) mx; urgency=medium
+
+  * bug fix
+
+ -- Adrian <adrian@local>  Thu, 16 Feb 2017 17:53:19 -0500
+
+s4-snapshot (16.12mx16) mx; urgency=medium
+
+  * alternative dependency: s4-iso-template
+
+ -- Adrian <adrian@local>  Mon, 05 Dec 2016 15:32:14 -0500
+
+s4-snapshot (16.11mx16+7) mx; urgency=medium
+
+  * added microsoft keyboard module to copy-initrd-modules
+
+ -- Adrian <adrian@local>  Fri, 02 Dec 2016 15:33:02 -0500
+
+s4-snapshot (16.11mx16+6) mx; urgency=medium
+
+  * new modules keyboard modules in copy-initrd-modules
+
+ -- Adrian <adrian@local>  Fri, 02 Dec 2016 09:06:34 -0500
+
+s4-snapshot (16.11mx16+5) mx; urgency=medium
+
+  * FR translation
+
+ -- Adrian <adrian@local>  Wed, 30 Nov 2016 12:45:59 -0500
+
+s4-snapshot (16.11mx16+4) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Wed, 16 Nov 2016 13:35:53 -0500
+
+s4-snapshot (16.11mx16+3) mx; urgency=medium
+
+  * bug fix
+
+ -- Adrian <adrian@local>  Mon, 07 Nov 2016 10:47:06 -0500
+
+s4-snapshot (16.11mx16+2) mx; urgency=medium
+
+  * small fix
+
+ -- Adrian <adrian@local>  Thu, 03 Nov 2016 15:08:50 -0400
+
+s4-snapshot (16.11mx16+1) mx; urgency=medium
+
+  * fix
+
+ -- Adrian <adrian@local>  Wed, 02 Nov 2016 18:30:35 -0400
+
+s4-snapshot (16.11mx16) mx; urgency=medium
+
+  * added -iso-level 3 to allow ISOs with files > 4GB
+
+ -- Adrian <adrian@local>  Tue, 01 Nov 2016 11:58:37 -0400
+
+s4-snapshot (16.10mx16+2) mx; urgency=medium
+
+  * re-added s4-remaster dependency
+
+ -- Adrian <adrian@local>  Sun, 23 Oct 2016 16:42:43 -0400
+
+s4-snapshot (16.10mx16+1) mx; urgency=medium
+
+  * replaced genisoimage with xorriso
+
+ -- Adrian <adrian@local>  Thu, 20 Oct 2016 13:50:35 -0400
+
+s4-snapshot (16.10mx16) mx; urgency=medium
+
+  * changed URLs
+
+ -- Adrian <adrian@local>  Mon, 10 Oct 2016 14:07:16 -0400
+
+s4-snapshot (16.8mx15) mx; urgency=medium
+
+  * added version to installed package list
+
+ -- Adrian <adrian@local>  Wed, 17 Aug 2016 12:47:09 -0400
+
+s4-snapshot (16.7mx15+3) mx; urgency=medium
+
+  * added new Mozilla cache location to exclude list
+
+ -- Adrian <adrian@local>  Sun, 24 Jul 2016 16:23:52 -0400
+
+s4-snapshot (16.7mx15+2) mx; urgency=medium
+
+  * bug fix: can now save snapshots on non-linux partitions
+
+ -- Adrian <adrian@local>  Sat, 09 Jul 2016 17:55:44 -0400
+
+s4-snapshot (16.7mx15+1) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Mon, 04 Jul 2016 12:33:31 -0400
+
+s4-snapshot (16.7mx15) mx; urgency=medium
+
+  * exclude extra two items
+
+ -- Adrian <adrian@local>  Sat, 02 Jul 2016 18:52:26 -0400
+
+s4-snapshot (16.6mx15+4) mx; urgency=medium
+
+  * updated copy-initrd-modules script
+
+ -- Adrian <adrian@local>  Thu, 30 Jun 2016 08:39:53 -0400
+
+s4-snapshot (16.6mx15+3) mx; urgency=medium
+
+  * fix: allow white spaces in the name of the work directory
+
+ -- Adrian <adrian@local>  Wed, 29 Jun 2016 20:30:07 -0400
+
+s4-snapshot (16.6mx15+2) mx; urgency=medium
+
+  * added GUI snapshot name edit option
+
+ -- Adrian <adrian@local>  Fri, 24 Jun 2016 23:55:11 -0400
+
+s4-snapshot (16.6mx15+1) mx; urgency=medium
+
+  * update copy-initrd-modules script
+
+ -- Adrian <adrian@local>  Tue, 14 Jun 2016 15:06:46 -0400
+
+s4-snapshot (16.6mx15) mx; urgency=medium
+
+  * minor fix
+
+ -- Adrian <adrian@local>  Mon, 06 Jun 2016 17:34:57 -0400
+
+s4-snapshot (16.3+2mx15) mx; urgency=medium
+
+  * new desktop file
+
+ -- dolphinoracle <dolphinoracle@gmail.com>  Mon, 23 May 2016 13:05:26 -0400
+
+s4-snapshot (16.3+1mx15) mx; urgency=medium
+
+  * added exclusion for file created by BroadcomStartup script
+
+ -- Adrian <adrian@local>  Thu, 17 Mar 2016 19:55:32 -0400
+
+s4-snapshot (16.3mx15) mx; urgency=medium
+
+  * removed wrong tooltip
+
+ -- Adrian <adrian@local>  Mon, 14 Mar 2016 19:43:07 -0400
+
+s4-snapshot (16.2mx15) mx; urgency=medium
+
+  * copy modules for non-PAE kernel
+
+ -- Adrian <adrian@local>  Wed, 17 Feb 2016 16:33:58 -0500
+
+s4-snapshot (16.1mx15) mx; urgency=medium
+
+  * new build that uses new template-initrd.gz
+
+ -- Adrian <adrian@local>  Thu, 07 Jan 2016 12:19:50 -0500
+
+s4-snapshot (15.12.16mx15) mx; urgency=medium
+
+  * new copy-initrd-modules to include all modules under kernel/drives/mmc
+
+ -- Adrian <adrian@local>  Thu, 07 Jan 2016 12:19:50 -0500
+
+s4-snapshot (15.12.15mx15) mx; urgency=medium
+
+  * new build
+
+ -- Adrian <adrian@local>  Wed, 23 Dec 2015 14:24:22 -0500
+
+s4-snapshot (15.12.14mx15) mx; urgency=medium
+
+  * new copy-initrd.gz file to fix Gaer Boy's issue"
+
+ -- anticapitalista <antiX@operamail.com>  Wed, 23 Dec 2015 20:41:04 +0200
+
+s4-snapshot (15.12.13mx15) mx; urgency=medium
+
+  * hide GUI when displaying help/license
+
+ -- Adrian <adrian@local>  Tue, 22 Dec 2015 22:45:15 -0500
+
+s4-snapshot (15.12.12mx15) mx; urgency=medium
+
+  * split iso-template in a different package
+
+ -- Adrian <adrian@local>  Sat, 19 Dec 2015 09:21:16 -0500
+
+s4-snapshot (15.12.11mx15) mx; urgency=medium
+
+  * initrd.gz locale upates
+
+ -- anticapitalista <antiX@operamail.com>  Thu, 17 Dec 2015 13:05:04 +0200
+
+s4-snapshot (15.12.10mx15) mx; urgency=medium
+
+  * initrd.gz upates
+
+ -- Adrian <adrian@local>  Wed, 16 Dec 2015 18:21:04 -0500
+
+s4-snapshot (15.12.9mx15) mx; urgency=medium
+
+  * fixed bug that crashed app when selecting different folder
+
+ -- Adrian <adrian@local>  Wed, 16 Dec 2015 13:31:41 -0500
+
+s4-snapshot (15.12.8mx15) mx; urgency=medium
+
+  * put bind-root in a hidden folder, mount read-only
+
+ -- Adrian <adrian@local>  Wed, 16 Dec 2015 08:32:10 -0500
+
+s4-snapshot (15.12.7mx15) mx; urgency=medium
+
+  * use /bind-root
+
+ -- Adrian <adrian@local>  Tue, 15 Dec 2015 18:21:28 -0500
+
+s4-snapshot (15.12.6mx15) mx; urgency=medium
+
+  * copy linuxfs before creating ISO
+
+ -- Adrian <adrian@local>  Mon, 14 Dec 2015 14:44:47 -0500
+
+s4-snapshot (15.12.5mx15) mx; urgency=medium
+
+  * copy initrrd-release file to initrd.gz
+
+ -- Adrian <adrian@local>  Fri, 11 Dec 2015 10:33:54 -0500
+
+s4-snapshot (15.12.4mx15) mx; urgency=medium
+
+  * initrd.gz fixes
+
+ -- Adrian <adrian@local>  Tue, 08 Dec 2015 12:04:05 -0500
+
+s4-snapshot (15.12.3mx15) mx; urgency=medium
+
+  *added initrd-release and live-hwclock to initrd.gz
+
+ -- Adrian <adrian@local>  Tue, 08 Dec 2015 08:42:04 -0500
+
+s4-snapshot (15.12.2mx15) mx; urgency=medium
+
+  * fixed cleanning code
+
+ -- Adrian <adrian@local>  Fri, 04 Dec 2015 17:17:37 -0500
+
+s4-snapshot (15.12.1mx15) mx; urgency=medium
+
+  * new build
+
+ -- Adrian <adrian@local>  Tue, 01 Dec 2015 09:23:25 -0500
+
+s4-snapshot (15.12mx15) mx; urgency=medium
+
+  * Minor changes to boot config files.
+  * copy-initrd-modules in-Sync with one in build iso
+
+ -- anticapitalista <antiX@operamail.com>  Tue, 01 Dec 2015 15:00:00 +0200
+
+s4-snapshot (15.11mx15) mx; urgency=medium
+
+  * changed to use installed-to-live script
+
+ -- Adrian <adrian@local>  Mon, 23 Nov 2015 17:07:18 -0500
+
+s4-snapshot (15.10.5mx15) mx; urgency=medium
+
+  * Removed x64 grub/syslinu/isolinux.cfg files.
+
+ -- anticapitalista <antiX@operamail.com>  Sat, 21 Nov 2015 14:14:00 +0200
+
+
+s4-snapshot (15.10.4mx15) mx; urgency=medium
+
+  * Brought up to date to beta2
+
+ -- anticapitalista <antiX@operamail.com>  Mon, 16 Nov 2015 17:14:00 +0200
+
+
+s4-snapshot (15.10.3mx15) mx; urgency=medium
+
+  * Brought up to date to a5
+
+ -- anticapitalista <antiX@operamail.com>  Thu, 29 Oct 2015 16:26:00 +0200
+
+
+s4-snapshot (15.10.2mx15) mx; urgency=medium
+
+  * new translations
+
+ -- Adrian <adrian@local>  Sat, 24 Oct 2015 19:20:37 -0400
+
+s4-snapshot (15.10.1mx15) mx; urgency=medium
+
+  * minor fix
+
+ -- Adrian <adrian@local>  Thu, 15 Oct 2015 11:07:38 -0400
+
+s4-snapshot (15.10mx15) mx; urgency=medium
+
+  * update with new ISO template
+
+ -- Adrian <adrian@local>  Sun, 11 Oct 2015 14:39:27 -0400
+
+s4-snapshot (15.8mx15) mx; urgency=medium
+
+  * various fixes
+
+ -- Adrian <adrian@local>  Fri, 07 Aug 2015 15:48:55 -0400
+
+s4-snapshot (15.7.3mx15) mx; urgency=medium
+
+  * using copy-initrd-modules and installed-to-live scripts
+
+ -- Adrian <adrian@local>  Sat, 25 Jul 2015 10:14:47 -0400
+
+s4-snapshot (15.7.2mx15) mx; urgency=medium
+
+  * update build-deps, fixed license
+
+ -- Adrian <adrian@local>  Thu, 09 Jul 2015 20:36:09 -0400
+
+s4-snapshot (15.7mx15) mx; urgency=medium
+
+  * update to qt5
+
+ -- Adrian <adrian@local>  Tue, 30 Jun 2015 14:23:08 -0400
+
+s4-snapshot (15.6.2mx14) mx; urgency=medium
+
+  * added some error checking
+
+ -- Adrian <adrian@local>  Wed, 17 Jun 2015 16:24:58 -0400
+
+s4-snapshot (15.6.1mx14) mx; urgency=medium
+
+  * removed home/demo exlusion
+
+ -- Adrian <adrian@local>  Tue, 16 Jun 2015 15:55:48 -0400
+
+s4-snapshot (15.6mx14) mx; urgency=medium
+
+  * changed documentation URL
+
+ -- Adrian <adrian@local>  Wed, 03 Jun 2015 13:09:36 -0400
+
+s4-snapshot (15.5.2mx14) mx; urgency=medium
+
+  * small adjustments in exclude list
+
+ -- Adrian <adrian@local>  Fri, 08 May 2015 10:16:11 -0400
+
+s4-snapshot (15.5.1mx14) mx; urgency=medium
+
+  * used the new syslinux/isolinux config files
+
+ -- Adrian <adrian@local>  Tue, 05 May 2015 15:52:00 -0400
+
+s4-snapshot (15.5mx14) mx; urgency=medium
+
+  * used the new init.rd from MX14.4
+
+ -- Adrian <adrian@local>  Tue, 05 May 2015 08:40:27 -0400
+
+s4-snapshot (15.4mx14) mx; urgency=medium
+
+  * added translation
+
+ -- Adrian <adrian@local>  Tue, 21 Apr 2015 14:12:40 -0400
+
+s4-snapshot (15.3mx14) mx; urgency=medium
+
+  * changed manual URL
+
+ -- Adrian <adrian@local>  Fri, 20 Mar 2015 16:52:26 -0400
+
+s4-snapshot (15.2.7) mx; urgency=medium
+
+  * re-add installer icon on desktop when taking "preserve acounts" snapshot
+
+ -- Adrian <adrian@local>  Thu, 26 Feb 2015 09:51:39 -0500
+
+s4-snapshot (15.2.6) mx; urgency=medium
+
+  * small fix, creating md5sum for linuxfs file
+
+ -- Adrian <adrian@local>  Wed, 25 Feb 2015 12:59:39 -0500
+
+s4-snapshot (15.2.5) mx; urgency=medium
+
+  * changed location exclue file
+
+ -- Adrian <adrian@local>  Fri, 20 Feb 2015 19:43:59 -0500
+
+s4-snapshot (15.2.4) mx; urgency=medium
+
+  * corrected URL
+
+ -- Adrian <adrian@local>  Sun, 15 Feb 2015 18:02:58 -0500
+
+s4-snapshot (15.2.3) mx; urgency=medium
+
+  * changed manual location, fixed displaying version
+
+ -- Adrian <adrian@local>  Sun, 15 Feb 2015 09:57:19 -0500
+
+s4-snapshot (15.2.2) mx; urgency=medium
+
+  * added installer icon on Desktop on resetting accounts
+
+ -- Adrian <adrian@local>  Sun, 08 Feb 2015 17:05:20 -0500
+
+s4-snapshot (15.2.1) mx; urgency=medium
+
+  * Changed "reset accounts" to not copy anything from /home
+
+ -- Adrian <adrian@local>  Fri, 06 Feb 2015 15:21:34 -0500
+
+s4-snapshot (15.2) mx; urgency=medium
+
+  * Added translations
+
+ -- Adrian <adrian@local>  Fri, 06 Feb 2015 08:10:08 -0500
+
+s4-snapshot (0.15.2) mx; urgency=medium
+
+  * Added respin option (reset root and demo passwords)
+
+ -- Adrian <adrian@local>  Sun, 01 Feb 2015 19:42:33 -0500
+
+s4-snapshot (0.14.3) mx; urgency=medium
+
+  * initial release
+
+ -- Adrian <adrian@local>  Sun, 14 Dec 2014 13:18:14 -0500

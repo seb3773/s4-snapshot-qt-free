@@ -1,0 +1,24 @@
+#!/bin/sh
+case "$1" in
+    install|upgrade)
+      set +e
+      echo "Adding initrd_release ..."
+      cat > "/etc/initrd_release" <<EOF
+NAME="MX"
+VERSION="13.x (Trixie)"
+ID="mx"
+VERSION_ID="12.x"
+PRETTY_NAME="Debian 13.x (Trixie)"
+ANSI_COLOR="0;34"
+HOME_URL="https://debian.org"
+BUG_REPORT_URL="https://debian.org"
+BASE="Debian"
+EOF
+
+      echo "Diverting Calamares launcher ..."
+      dpkg-divert --quiet --rename --divert /usr/bin/add-calamares-desktop-icon.real1 /usr/bin/add-calamares-desktop-icon
+    ;;
+
+    *)
+    ;;
+esac

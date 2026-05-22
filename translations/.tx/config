@@ -1,0 +1,9 @@
+[main]
+host = https://www.transifex.com
+
+[o:anticapitalista:p:antix-development:r:s4-snapshot]
+file_filter = ./s4-snapshot_<lang>.ts
+source_file = s4-snapshot_en.ts
+source_lang = en
+type = ts
+minimum_perc = 25

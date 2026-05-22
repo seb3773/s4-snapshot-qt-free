@@ -1,0 +1,8 @@
+[main]
+host = https://www.transifex.com
+
+[o:anticapitalista:p:antix-development:r:s4-snapshot-desktop]
+file_filter = po/s4-snapshot-desktop_<lang>.po
+source_file = s4-snapshot-desktop.pot
+source_lang = en
+type = po

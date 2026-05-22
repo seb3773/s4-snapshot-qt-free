@@ -1,0 +1,240 @@
+# **********************************************************************
+# * S4 Snapshot - Git Ignore Configuration
+# * 
+# * This file excludes build artifacts, temporary files, and local
+# * development configurations from version control.
+# **********************************************************************
+
+# ============================================================================
+# BUILD DIRECTORIES
+# ============================================================================
+# All CMake build directories
+build-*/
+build_*/
+build/
+
+# Specific build directories
+build-gui/
+build-make/
+build-nqt/
+build-qt/
+build-tests/
+
+# ============================================================================
+# QT TEMPORARY FILES & CACHES
+# ============================================================================
+# Qt Creator cache and settings
+.qtcreator/
+*.autosave
+*.user
+*.user.*
+
+# Qt build system caches
+.qt/
+.qmake.stash
+.qmake.cache
+*.pro.user
+*.pro.user.*
+
+# Qt resource compiler cache
+.rcc/
+
+# Qt lupdate cache
+.lupdate/
+
+# Qt MOC, UIC, RCC generated files (if not in build dirs)
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# Qt translation binaries (generated, not source .ts files)
+*.qm
+
+# ============================================================================
+# CMAKE TEMPORARY FILES
+# ============================================================================
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+!cmake/*.cmake
+
+# ============================================================================
+# COMPILER & LINKER OUTPUT
+# ============================================================================
+# Object files
+*.o
+*.obj
+*.lo
+*.slo
+
+# Compiled binaries
+*.exe
+*.out
+*.app
+*.so
+*.so.*
+*.dylib
+*.dll
+*.a
+*.lib
+
+# Precompiled headers
+*.gch
+*.pch
+
+# ============================================================================
+# DEVELOPMENT TOOLS & IDE CONFIGURATIONS
+# ============================================================================
+# VSCode (personal configuration)
+.vscode/
+
+# Claude AI assistant (personal configuration)
+.claude/
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================================================
+# TEMPORARY WORK FILES
+# ============================================================================
+# Markdown work files (development notes)
+_work_md_files/
+
+# Backup files
+*.backup
+*.bak
+*.orig
+*.tmp
+*~
+
+# ============================================================================
+# SYSTEM FILES
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============================================================================
+# LOGS & DEBUG FILES
+# ============================================================================
+*.log
+*.out
+*.err
+core
+core.*
+vgcore.*
+
+# ============================================================================
+# TESTING & COVERAGE
+# ============================================================================
+# Test results
+test-results/
+*.test
+*.trs
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+coverage/
+htmlcov/
+
+# ============================================================================
+# PACKAGING (Keep source, ignore generated)
+# ============================================================================
+# Debian packaging - keep source files, ignore generated
+debian/files
+debian/*.debhelper
+debian/*.log
+debian/*.substvars
+debian/tmp/
+debian/.debhelper/
+
+# ============================================================================
+# DOCUMENTATION GENERATION
+# ============================================================================
+# Doxygen output
+docs/html/
+docs/latex/
+docs/man/
+
+# ============================================================================
+# RUNTIME & TEMPORARY FILES
+# ============================================================================
+# Core dumps
+core
+core.*
+
+# PID files
+*.pid
+
+# Socket files
+*.sock
+
+# Temporary directories
+tmp/
+temp/
+.tmp/
+
+# ============================================================================
+# PROJECT-SPECIFIC EXCLUSIONS
+# ============================================================================
+# ISO images (large binary files)
+*.iso
+*.img
+
+# Squashfs filesystems (large binary files)
+*.squashfs
+
+# Compressed archives (if generated during build)
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zip
+
+# ============================================================================
+# KEEP IMPORTANT FILES (Explicit exceptions)
+# ============================================================================
+# Keep packaging configurations
+!.obs/
+!debian/
+
+# Keep build scripts
+!*.sh
+
+# Keep CMake configuration
+!CMakeLists.txt
+
+# Keep documentation
+!*.md
+!docs/
+
+# Keep translation source files
+!translations/**/*.ts
+!translations/**/*.kv
+
+# Made with Bob
