@@ -24,12 +24,12 @@ Summary: S4 Snapshot creates bootable live ISO images from running Debian-based 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     User Interfaces                          │
-├──────────────────┬──────────────────┬──────────────────────┤
-│   Qt6 GUI        │   CLI (Qt-free)  │   Helper (Qt-free)   │
-│ (src_gui_qt6_   │  (main_cli_cpp)  │     (helper.cpp)     │
+│                     User Interfaces                         │
+├──────────────────┬──────────────────┬──────────────────-────┤
+│   Qt6 GUI        │   CLI (Qt-free)  │   Helper (Qt-free)    │
+│ (src_gui_qt6_    │  (main_cli_cpp)  │     (helper.cpp)      │
 │  cpp_backend/)   │                  │                       │
-└────────┬─────────┴────────┬─────────┴──────────┬───────────┘
+└────────┬─────────┴────────┬─────────┴─────-─────┬───────────┘
          │                  │                     │
          └──────────────────┼─────────────────────┘
                             │
