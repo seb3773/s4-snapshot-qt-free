@@ -37,12 +37,20 @@ if ! command -v qmake6 &> /dev/null && ! command -v qmake &> /dev/null; then
     exit 1
 fi
 
-# Check if i18n_keyval is available
-if [ ! -d "libs/i18n_keyval" ]; then
-    echo "ERROR: i18n_keyval library not found at libs/i18n_keyval"
-    echo "This is a required dependency included in the project."
-    echo "Please ensure you have the complete project source."
-    exit 1
+# Check if i18n_keyval is available and populated
+if [ ! -f "libs/i18n_keyval/CMakeLists.txt" ]; then
+    echo "i18n_keyval library not found or incomplete at libs/i18n_keyval."
+    if [ -d ".git" ]; then
+        echo "Attempting to initialize and update git submodules..."
+        git submodule update --init --recursive
+    fi
+
+    if [ ! -f "libs/i18n_keyval/CMakeLists.txt" ]; then
+        echo "ERROR: i18n_keyval library not found or missing CMakeLists.txt."
+        echo "This is a required dependency. Please run:"
+        echo "  git submodule update --init --recursive"
+        exit 1
+    fi
 fi
 
 echo "Step 1/2: Configuring..."
