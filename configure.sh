@@ -92,6 +92,21 @@ if ! check_command lslogins; then
     echo -e "${YELLOW}⚠${NC} lslogins not found (usually in util-linux)"
 fi
 
+# Required Q4OS/antiX Live ecosystem dependencies
+if ! [ -f "/usr/sbin/installed-to-live" ] && ! [ -f "/usr/bin/installed-to-live" ]; then
+    echo -e "${RED}✗${NC} installed-to-live not found"
+    MISSING_DEPS+=("s4-remaster (provides /usr/sbin/installed-to-live)")
+else
+    echo -e "${GREEN}✓${NC} installed-to-live found"
+fi
+
+if ! [ -f "/usr/lib/iso-template/iso-template.tar.gz" ] && ! [ -f "/usr/lib/iso-template/iso-template-multi.tar.gz" ]; then
+    echo -e "${RED}✗${NC} iso-template tarball not found"
+    MISSING_DEPS+=("s4-iso-template (provides /usr/lib/iso-template/iso-template.tar.gz)")
+else
+    echo -e "${GREEN}✓${NC} s4-iso-template files found"
+fi
+
 echo ""
 echo "Checking Qt6 (optional, for GUI)..."
 echo "------------------------------------"
