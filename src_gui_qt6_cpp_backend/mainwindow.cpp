@@ -129,6 +129,10 @@ void MainWindow::loadSettings()
     if (dataFilesPath.isEmpty()) {
         dataFilesPath = qt_settings.value("datafiles_path").toString();
     }
+    QString templatesPath = settings->templatesPathArg;
+    if (templatesPath.isEmpty()) {
+        templatesPath = qt_settings.value("templates_path").toString();
+    }
     if (dataFilesPath.isEmpty()) {
         SettingsArgsCpp args;
         const SettingsCpp built = SettingsCppBuilder::buildFromArgs(
@@ -137,8 +141,21 @@ void MainWindow::loadSettings()
             QCoreApplication::applicationName().toStdString(),
             QCoreApplication::organizationName().toStdString());
         dataFilesPath = QString::fromStdString(built.dataFilesPath);
+        if (templatesPath.isEmpty()) {
+            templatesPath = QString::fromStdString(built.templatesPath);
+        }
     }
     ui->lineEditDataFilesPath->setText(dataFilesPath);
+    if (templatesPath.isEmpty()) {
+        SettingsArgsCpp args;
+        const SettingsCpp built = SettingsCppBuilder::buildFromArgs(
+            args,
+            true,
+            QCoreApplication::applicationName().toStdString(),
+            QCoreApplication::organizationName().toStdString());
+        templatesPath = QString::fromStdString(built.templatesPath);
+    }
+    ui->lineEditTemplatesPath->setText(templatesPath);
 
     updateCustomExcludesButton();
     watchExcludesFile();
@@ -416,6 +433,9 @@ void MainWindow::setConnections()
     connect(ui->btnSelectDataFiles, &QPushButton::clicked, this, &MainWindow::btnSelectDataFiles_clicked);
     connect(ui->lineEditDataFilesPath, &QLineEdit::editingFinished, this,
             &MainWindow::lineEditDataFilesPath_editingFinished);
+    connect(ui->btnSelectTemplates, &QPushButton::clicked, this, &MainWindow::btnSelectTemplates_clicked);
+    connect(ui->lineEditTemplatesPath, &QLineEdit::editingFinished, this,
+            &MainWindow::lineEditTemplatesPath_editingFinished);
     connect(ui->cbCompression, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &MainWindow::cbCompression_currentIndexChanged);
     connect(ui->checkMd5, &QCheckBox::toggled, this, &MainWindow::checkMd5_toggled);
@@ -691,11 +711,24 @@ void MainWindow::showErrorMessageBox(const QString &file_path)
         tr("Output file %1 already exists. Please use another file name, or delete the existent file.").arg(file_path));
 }
 
+bool MainWindow::isTemplatesPathValid(const QString &path) const
+{
+    const QString trimmed = path.trimmed();
+    return QFileInfo::exists(trimmed + "/iso-template.tar.gz")
+        && QFileInfo::exists(trimmed + "/template-initrd.gz");
+}
+
 void MainWindow::handleSelectionPage(const QString &file_name)
 {
     if (!settings->validateSpaceRequirements()) {
         processMsgBox(BoxType::critical, tr("Error"),
                       tr("Insufficient free space. Please select a different snapshot directory or free up space."));
+        return;
+    }
+
+    if (!isTemplatesPathValid(ui->lineEditTemplatesPath->text())) {
+        processMsgBox(BoxType::critical, tr("Error"),
+                      tr("ISO templates directory is invalid. It must contain iso-template.tar.gz and template-initrd.gz."));
         return;
     }
 
@@ -710,7 +743,8 @@ void MainWindow::handleSelectionPage(const QString &file_name)
     ui->labelSummary->setText("\n" + tr("- Snapshot directory:") + " " + settings->snapshotDir + "\n" + "- "
                               + tr("Snapshot name:") + " " + file_name + "\n" + tr("- Kernel to be used:") + " "
                               + settings->kernel + "\n" + tr("- Live files data:") + " "
-                              + ui->lineEditDataFilesPath->text().trimmed() + "\n");
+                              + ui->lineEditDataFilesPath->text().trimmed() + "\n" + tr("- ISO templates:") + " "
+                              + ui->lineEditTemplatesPath->text().trimmed() + "\n");
     settings->codename = ui->textCodename->text();
     settings->distroVersion = ui->textDistroVersion->text();
     settings->projectName = ui->textProjectName->text();
@@ -928,6 +962,10 @@ void MainWindow::prepareForOutput(const QString &/*file_name*/)
     const QString dataFilesPath = ui->lineEditDataFilesPath->text().trimmed();
     if (!dataFilesPath.isEmpty()) {
         args.dataFilesPathArg = dataFilesPath.toStdString();
+    }
+    const QString templatesPath = ui->lineEditTemplatesPath->text().trimmed();
+    if (!templatesPath.isEmpty()) {
+        args.templatesPathArg = templatesPath.toStdString();
     }
 
     // CRITICAL: Save sessionExcludes BEFORE buildFromArgs (which clears it)
@@ -1189,6 +1227,37 @@ void MainWindow::lineEditDataFilesPath_editingFinished()
     qt_settings.setValue("datafiles_path", ui->lineEditDataFilesPath->text().trimmed());
 }
 
+void MainWindow::btnSelectTemplates_clicked()
+{
+    const QString current = ui->lineEditTemplatesPath->text().trimmed();
+    const QString selected = QFileDialog::getExistingDirectory(
+        this, tr("Select ISO templates directory"), current, QFileDialog::ShowDirsOnly);
+    if (selected.isEmpty()) {
+        return;
+    }
+    if (!isTemplatesPathValid(selected)) {
+        QMessageBox::critical(this,
+                              tr("Error"),
+                              tr("ISO templates directory is invalid. It must contain iso-template.tar.gz and template-initrd.gz."));
+        return;
+    }
+    ui->lineEditTemplatesPath->setText(selected);
+    qt_settings.setValue("templates_path", selected);
+}
+
+void MainWindow::lineEditTemplatesPath_editingFinished()
+{
+    const QString path = ui->lineEditTemplatesPath->text().trimmed();
+    if (!isTemplatesPathValid(path)) {
+        QMessageBox::critical(this,
+                              tr("Error"),
+                              tr("ISO templates directory is invalid. It must contain iso-template.tar.gz and template-initrd.gz."));
+        ui->lineEditTemplatesPath->setText(qt_settings.value("templates_path").toString());
+        return;
+    }
+    qt_settings.setValue("templates_path", path);
+}
+
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
@@ -1443,6 +1512,7 @@ void MainWindow::enableControls(bool enable)
     ui->btnHelp->setEnabled(enable);
     ui->btnSelectSnapshot->setEnabled(enable);
     ui->btnSelectDataFiles->setEnabled(enable);
+    ui->btnSelectTemplates->setEnabled(enable);
     ui->btnEditExclude->setEnabled(enable);
     ui->btnRemoveCustomExclude->setEnabled(enable);
     
@@ -1455,6 +1525,7 @@ void MainWindow::enableControls(bool enable)
     ui->pushReleaseDate->setEnabled(enable);
     ui->lineEditName->setEnabled(enable);
     ui->lineEditDataFilesPath->setEnabled(enable);
+    ui->lineEditTemplatesPath->setEnabled(enable);
 
     // Settings page - Exclusion checkboxes
     ui->excludeAll->setEnabled(enable);

@@ -200,6 +200,7 @@ public:
     QString projectName;
     QString releaseDate;
     QString dataFilesPathArg;
+    QString templatesPathArg;
     bool makeMd5sum {};
     bool makeSha512sum {};
     bool resetAccounts {};

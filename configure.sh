@@ -92,19 +92,19 @@ if ! check_command lslogins; then
     echo -e "${YELLOW}⚠${NC} lslogins not found (usually in util-linux)"
 fi
 
-# Required Q4OS/antiX Live ecosystem dependencies
-if ! [ -f "/usr/sbin/installed-to-live" ] && ! [ -f "/usr/bin/installed-to-live" ]; then
-    echo -e "${RED}✗${NC} installed-to-live not found"
-    MISSING_DEPS+=("s4-remaster (provides /usr/sbin/installed-to-live)")
+# Vendored live ecosystem data
+if ! [ -d "data/live-files/files" ] || ! [ -d "data/live-files/general-files" ]; then
+    echo -e "${RED}✗${NC} vendored live-files data not found"
+    MISSING_DEPS+=("data/live-files")
 else
-    echo -e "${GREEN}✓${NC} installed-to-live found"
+    echo -e "${GREEN}✓${NC} vendored live-files data found"
 fi
 
-if ! [ -f "/usr/lib/iso-template/iso-template.tar.gz" ] && ! [ -f "/usr/lib/iso-template/iso-template-multi.tar.gz" ]; then
-    echo -e "${RED}✗${NC} iso-template tarball not found"
-    MISSING_DEPS+=("s4-iso-template (provides /usr/lib/iso-template/iso-template.tar.gz)")
+if ! [ -f "data/s4-iso-templates/iso-template.tar.gz" ] || ! [ -f "data/s4-iso-templates/template-initrd.gz" ]; then
+    echo -e "${RED}✗${NC} vendored ISO templates not found"
+    MISSING_DEPS+=("data/s4-iso-templates")
 else
-    echo -e "${GREEN}✓${NC} s4-iso-template files found"
+    echo -e "${GREEN}✓${NC} vendored ISO templates found"
 fi
 
 echo ""

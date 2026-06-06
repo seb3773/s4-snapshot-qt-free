@@ -163,6 +163,16 @@ void SettingsProcessArgsCpp::applyLikeSettingsQt(SettingsCpp &settings, const In
         }
     }
 
+    if (!in.templatesPathArg.empty()) {
+        if (FileCpp::exists(in.templatesPathArg + "/iso-template.tar.gz")
+            && FileCpp::exists(in.templatesPathArg + "/template-initrd.gz")) {
+            settings.templatesPath = DirCpp::absolutePath(in.templatesPathArg);
+        } else {
+            warn(callbacks, std::string("ISO templates directory is invalid: ") + qt_quote(in.templatesPathArg));
+            die_failure();
+        }
+    }
+
     if (!in.fileArg.empty()) {
         settings.snapshotName = in.fileArg + (ends_with(in.fileArg, ".iso") ? std::string() : std::string(".iso"));
     } else {

@@ -29,6 +29,20 @@ static std::string trim_ascii(const std::string &s)
     return s.substr(b, e - b);
 }
 
+static std::string shell_quote(const std::string &s)
+{
+    std::string out = "'";
+    for (char ch : s) {
+        if (ch == '\'') {
+            out += "'\\''";
+        } else {
+            out.push_back(ch);
+        }
+    }
+    out += "'";
+    return out;
+}
+
 static void plan_message(WorkCppPlan &p, const std::string &s)
 {
     WorkCppPlanStep st;
@@ -395,13 +409,26 @@ WorkCppPlan WorkCppPlanner::planCopyNewIso(const SettingsCpp &settings, const Co
     plan_message(p, "Copying the new-iso filesystem...");
     plan_chdir(p, settings.workDir);
 
-    if (env.isoTemplateMultiExists && env.sysvinitInitExists && env.systemdSystemdExists) {
+    const std::string templatesPath = settings.templatesPath.empty() ? "/usr/lib/iso-template" : settings.templatesPath;
+    const std::string regularTemplate = templatesPath + "/iso-template.tar.gz";
+    const std::string multiTemplate = templatesPath + "/iso-template-multi.tar.gz";
+    const std::string initrdTemplate = templatesPath + "/template-initrd.gz";
+
+    if (settings.templatesPath.empty() && env.isoTemplateMultiExists && env.sysvinitInitExists && env.systemdSystemdExists) {
         plan_run_cmd(p, "tar xf /usr/lib/iso-template/iso-template-multi.tar.gz", false);
-    } else {
+    } else if (settings.templatesPath.empty()) {
         plan_run_cmd(p, "tar xf /usr/lib/iso-template/iso-template.tar.gz", false);
+    } else if (env.isoTemplateMultiExists && env.sysvinitInitExists && env.systemdSystemdExists) {
+        plan_run_cmd(p, "tar xf " + shell_quote(multiTemplate), false);
+    } else {
+        plan_run_cmd(p, "tar xf " + shell_quote(regularTemplate), false);
     }
 
-    plan_run_cmd(p, "cp /usr/lib/iso-template/template-initrd.gz iso-template/antiX/initrd.gz", false);
+    if (settings.templatesPath.empty()) {
+        plan_run_cmd(p, "cp /usr/lib/iso-template/template-initrd.gz iso-template/antiX/initrd.gz", false);
+    } else {
+        plan_run_cmd(p, "cp " + shell_quote(initrdTemplate) + " iso-template/antiX/initrd.gz", false);
+    }
     plan_run_cmd(p,
                  std::string("cp /boot/vmlinuz-") + settings.kernel + " iso-template/antiX/vmlinuz",
                  false);

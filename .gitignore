@@ -237,4 +237,8 @@ temp/
 !translations/**/*.ts
 !translations/**/*.kv
 
+# Keep vendored ISO template archives
+!data/s4-iso-templates/
+!data/s4-iso-templates/*.tar.gz
+
 # Made with Bob

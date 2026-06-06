@@ -110,6 +110,7 @@ static SettingsProcessArgsCpp::Input make_process_args_input(const CommandLinePa
     in.coresArg = parser.value("cores");
     in.throttleArg = parser.value("throttle");
     in.dataFilesPathArg = parser.value("datafiles-path");
+    in.templatesPathArg = parser.value("templates-path");
 
     in.defaultSnapshotName = defaultSnapshotName;
 
@@ -309,6 +310,7 @@ int main(int argc, char **argv)
                       "number"});
     parser.addOption({{"w", "workdir"}, AppTranslatorCpp::tQt("QObject", "Work directory"), "path"});
     parser.addOption({{"datafiles-path"}, "Path to live-files data directory", "path"});
+    parser.addOption({{"templates-path"}, "Path to ISO templates directory", "path"});
     parser.addOption({{"x", "exclude"},
                       AppTranslatorCpp::tQt("QObject", "Exclude main folders, valid choices: Desktop, Documents, Downloads, Flatpaks, Music, Networks, Pictures, Steam, Videos, VirtualBox. Use the option one time for each item you want to exclude"),
                       AppTranslatorCpp::tQt("QObject", "one item")});

@@ -1839,6 +1839,16 @@ void Settings::processArgs(
 #endif
 
 #ifdef CLI_BUILD
+    if (!valueQ("templates-path").isEmpty()) {
+        templatesPathArg = valueQ("templates-path");
+    }
+#else
+    if (!argParser.value("templates-path").isEmpty()) {
+        templatesPathArg = argParser.value("templates-path");
+    }
+#endif
+
+#ifdef CLI_BUILD
     if (!valueQ("file").isEmpty()) {
         const auto fileArg = valueQ("file");
 #else

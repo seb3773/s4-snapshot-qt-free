@@ -386,7 +386,10 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::runFromSettings(Setti
     // copyNewIso/createIso env require runtime probing; keep conservative defaults.
     env.copyNewIsoEnv.applicationName = applicationName;
     env.copyNewIsoEnv.loggedInUserName = CommandRunner::loggedInUserName();
-    env.copyNewIsoEnv.isoTemplateMultiExists = FileCpp::exists("/usr/lib/iso-template/iso-template-multi.tar.gz");
+    {
+        const std::string templatesPath = out.settings.templatesPath.empty() ? "/usr/lib/iso-template" : out.settings.templatesPath;
+        env.copyNewIsoEnv.isoTemplateMultiExists = FileCpp::exists(templatesPath + "/iso-template-multi.tar.gz");
+    }
     env.copyNewIsoEnv.sysvinitInitExists = FileCpp::exists("/usr/lib/sysvinit/init");
     env.copyNewIsoEnv.systemdSystemdExists = FileCpp::exists("/usr/lib/systemd/systemd");
     {

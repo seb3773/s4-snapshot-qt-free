@@ -201,6 +201,9 @@ sudo iso-snapshot-cli --file my-system.iso --kernel 6.1.0-18-amd64
 # Use an alternate live-files data directory
 sudo iso-snapshot-cli --file my-system.iso --datafiles-path /path/to/live-files
 
+# Use an alternate ISO templates directory
+sudo iso-snapshot-cli --file my-system.iso --templates-path /path/to/s4-iso-templates
+
 # show help
 iso-snapshot-cli --help
 
@@ -352,6 +355,18 @@ live-files/
 ```
 
 The backend resolves live data files in this order: explicit `--datafiles-path`, vendored project data (`data/live-files/`), installed package paths under `/usr/share`, then legacy paths under `/usr/local/share/live-files` and `/usr/share/live-files`. This keeps local testing flexible while preparing for a self-contained package.
+
+The ISO boot templates are now vendored in `data/s4-iso-templates/` and can be overridden with `--templates-path <path>`. The expected directory layout is:
+
+```
+s4-iso-templates/
+├── iso-template.tar.gz
+└── template-initrd.gz
+```
+
+If `iso-template-multi.tar.gz` is present in the same directory and both sysvinit and systemd are installed, the backend keeps the legacy behavior and uses it. The required files remain `iso-template.tar.gz` and `template-initrd.gz`.
+
+The backend resolves ISO templates in this order: explicit `--templates-path`, vendored project data (`data/s4-iso-templates/`), installed package paths under `/usr/share`, then the legacy `/usr/lib/iso-template` path.
 
 **validation**:
 - `settings_validation_cpp.cpp` - configuration validation
