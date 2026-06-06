@@ -52,6 +52,7 @@ public:
     ~MainWindow() override;
 
 protected:
+    void closeEvent(QCloseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
 public slots:
@@ -152,4 +153,6 @@ private:
     
     // Control state management during execution
     void enableControls(bool enable);
+    void applyStartupGeometry();
+    void saveWindowGeometry();
 };

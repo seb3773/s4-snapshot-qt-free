@@ -40,6 +40,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QCloseEvent>
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -79,7 +80,6 @@ MainWindow::MainWindow(Settings *settings, QWidget *parent)
     
     setConnections();
     setup();
-    restoreGeometry(qt_settings.value("geometry").toByteArray());
     loadSettings();
     listFreeSpace();
     setExclusions();
@@ -91,6 +91,13 @@ MainWindow::MainWindow(Settings *settings, QWidget *parent)
         listUsedSpace();
     }
     watchExcludesFile();
+    applyStartupGeometry();
+    show();
+
+    const QByteArray savedGeometry = qt_settings.value("geometry").toByteArray();
+    if (!savedGeometry.isEmpty()) {
+        restoreGeometry(savedGeometry);
+    }
 }
 
 MainWindow::~MainWindow() = default;
@@ -397,7 +404,7 @@ void MainWindow::setConnections()
     // Note: Callbacks are now passed directly to BatchprocessingCppRunner::runFromSettings()
     // in prepareForOutput() method. The backend calls handleBackendMessage() and handleBackendLog()
     // which in turn call processMsg() and processMsgBox() as needed.
-    connect(QApplication::instance(), &QApplication::aboutToQuit, this, [this] { cleanUp(); });
+    connect(QApplication::instance(), &QApplication::aboutToQuit, this, [this] { saveWindowGeometry(); });
     connect(ui->btnAbout, &QPushButton::clicked, this, &MainWindow::btnAbout_clicked);
     connect(ui->btnBack, &QPushButton::clicked, this, &MainWindow::btnBack_clicked);
     connect(ui->btnCancel, &QPushButton::clicked, this, &MainWindow::btnCancel_clicked);
@@ -493,13 +500,28 @@ void MainWindow::setup()
         ui->labelThrottle->hide();
         ui->spinThrottle->hide();
     }
+}
 
-    show();
+void MainWindow::applyStartupGeometry()
+{
+    static constexpr int kDefaultWidth = 984;
+    static constexpr int kDefaultHeight = 650;
+
+    setMinimumHeight(kDefaultHeight);
+
+    if (qt_settings.value("geometry").toByteArray().isEmpty()) {
+        resize(kDefaultWidth, kDefaultHeight);
+    }
+}
+
+void MainWindow::saveWindowGeometry()
+{
+    qt_settings.setValue("geometry", saveGeometry());
+    qt_settings.sync();
 }
 
 void MainWindow::listUsedSpace()
 {
-    show();
     ui->btnNext->setDisabled(true);
     ui->btnCancel->setDisabled(true);
     ui->btnSelectSnapshot->setDisabled(true);
@@ -1174,6 +1196,21 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
     }
 }
 
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (ui->stackedWidget->currentWidget() == ui->outputPage && m_operationInProgress.load()) {
+        if (QMessageBox::Yes
+            != QMessageBox::question(this, tr("Confirmation"), tr("Are you sure you want to quit the application?"),
+                                     QMessageBox::Yes | QMessageBox::No)) {
+            event->ignore();
+            return;
+        }
+    }
+
+    saveWindowGeometry();
+    event->accept();
+}
+
 void MainWindow::closeApp()
 {
     // Ask for confirmation when on outputPage and not done
@@ -1184,7 +1221,7 @@ void MainWindow::closeApp()
             return;
         }
     }
-    qt_settings.setValue("geometry", saveGeometry());
+    saveWindowGeometry();
     cleanUp();
 }
 
