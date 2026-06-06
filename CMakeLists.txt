@@ -182,6 +182,8 @@ set(COMMON_HEADERS
 
 set(HELPER_SOURCES
     src/helper.cpp
+    src/installed_to_live_cpp.cpp
+    src/installed_to_live_cpp.h
     src/process_runner.cpp
     src/process_runner.h
     src/file_cpp.cpp
@@ -404,6 +406,7 @@ add_executable(helper
 
 target_link_libraries(helper
     i18n_keyval::i18n_keyval
+    crypt
 )
 
 set_target_properties(helper PROPERTIES
@@ -413,7 +416,7 @@ set_target_properties(helper PROPERTIES
 
 if(QT_FREE_GUARDS)
     add_custom_command(TARGET helper POST_BUILD
-        COMMAND /bin/bash -c "set -euo pipefail; grep -nH '#include <Q' ${CMAKE_SOURCE_DIR}/src/helper.cpp ${CMAKE_SOURCE_DIR}/src/process_runner.cpp ${CMAKE_SOURCE_DIR}/src/file_cpp.cpp ${CMAKE_SOURCE_DIR}/src/stdio_cpp.cpp && { echo 'ERROR: Qt include found in qt-free target helper'; exit 1; } || true"
+        COMMAND /bin/bash -c "set -euo pipefail; grep -nH '#include <Q' ${CMAKE_SOURCE_DIR}/src/helper.cpp ${CMAKE_SOURCE_DIR}/src/installed_to_live_cpp.cpp ${CMAKE_SOURCE_DIR}/src/process_runner.cpp ${CMAKE_SOURCE_DIR}/src/file_cpp.cpp ${CMAKE_SOURCE_DIR}/src/stdio_cpp.cpp && { echo 'ERROR: Qt include found in qt-free target helper'; exit 1; } || true"
         COMMAND /bin/bash -c "set -euo pipefail; ldd $<TARGET_FILE:helper> | grep -i qt && { echo 'ERROR: Qt library linked into qt-free target helper'; exit 1; } || true"
         VERBATIM
     )
@@ -576,6 +579,7 @@ function(set_common_properties target)
         QT_DEPRECATED_WARNINGS
         QT_DISABLE_DEPRECATED_BEFORE=0x060000
         VERSION="${PROJECT_VERSION}"
+        PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
     )
 
     # Build type specific optimizations

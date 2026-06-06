@@ -520,9 +520,14 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
 
     // writeVersionFile()
     {
-        std::string filePath = env.mxVersionFileExistsInUsrLocal
-                                   ? "/usr/local/share/live-files/files/etc/mx-version"
-                                   : "/usr/share/live-files/files/etc/mx-version";
+        std::string filePath;
+        if (!settings.dataFilesPath.empty()) {
+            filePath = settings.dataFilesPath + "/files/etc/mx-version";
+        } else {
+            filePath = env.mxVersionFileExistsInUsrLocal
+                           ? "/usr/local/share/live-files/files/etc/mx-version"
+                           : "/usr/share/live-files/files/etc/mx-version";
+        }
         plan_run_cmd(p,
                      std::string("WRITE_TEXT_FILE_UTF8_TRUNCATE ") + filePath + " "
                          + (settings.fullDistroName + " " + settings.codename + " " + settings.releaseDate + "\n"),
@@ -531,9 +536,14 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
 
     // writeLsbRelease()
     {
-        std::string filePath = env.lsbReleaseExistsInUsrLocal
-                                   ? "/usr/local/share/live-files/files/etc/lsb-release"
-                                   : "/usr/share/live-files/files/etc/lsb-release";
+        std::string filePath;
+        if (!settings.dataFilesPath.empty()) {
+            filePath = settings.dataFilesPath + "/files/etc/lsb-release";
+        } else {
+            filePath = env.lsbReleaseExistsInUsrLocal
+                           ? "/usr/local/share/live-files/files/etc/lsb-release"
+                           : "/usr/share/live-files/files/etc/lsb-release";
+        }
         const std::string text = WorkCppUtils::buildLsbReleaseContent(
             settings.projectName,
             settings.distroVersion,
@@ -610,7 +620,12 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
         plan_proc_root(p, "mkdir", {"-p", "/var/lib/mxdebian/"}, true);
         plan_proc_root(p, "touch", {"-p", "/var/lib/mxdebian/.mxsnapshot_accounts_reset.stp"}, true);
 
-        std::vector<std::string> args {"-F", "-b", bindRootPathForInstalledToLive, "start"};
+        std::vector<std::string> args {"-F", "-b", bindRootPathForInstalledToLive};
+        if (!settings.dataFilesPath.empty()) {
+            args.push_back("-t");
+            args.push_back(settings.dataFilesPath);
+        }
+        args.push_back("start");
         if (!bind_boot.empty()) {
             args.push_back("bind=/boot");
         }
@@ -627,7 +642,12 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
                      "CHECK_RESULT installed-to-live resetAccounts else ERROR: Could not prepare the snapshot bind-root environment.",
                      true);
     } else {
-        std::vector<std::string> args {"-F", "-b", bindRootPathForInstalledToLive, "start"};
+        std::vector<std::string> args {"-F", "-b", bindRootPathForInstalledToLive};
+        if (!settings.dataFilesPath.empty()) {
+            args.push_back("-t");
+            args.push_back(settings.dataFilesPath);
+        }
+        args.push_back("start");
         args.push_back(std::string("bind=/home") + bind_boot_too);
         args.push_back("live-files");
         args.push_back("version-file");

@@ -73,6 +73,8 @@ private slots:
     void btnHelp_clicked();
     void btnNext_clicked();
     void btnSelectSnapshot_clicked();
+    void btnSelectDataFiles_clicked();
+    void lineEditDataFilesPath_editingFinished();
     void cbCompression_currentIndexChanged();
     void checkMd5_toggled(bool checked);
     void checkSha512_toggled(bool checked);

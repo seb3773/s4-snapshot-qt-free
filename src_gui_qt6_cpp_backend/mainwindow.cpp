@@ -28,6 +28,7 @@
 #include <QtConcurrent>
 #include <QPointer>
 #include <iostream>
+#include <QCoreApplication>
 #include <QCalendarWidget>
 #include <QDateTime>
 #include <QDialog>
@@ -116,6 +117,22 @@ void MainWindow::loadSettings()
                    [](const QString &file) { return file.mid(QStringLiteral("vmlinuz-").length()); });
     ui->comboLiveKernel->addItems(kernelFiles);
     ui->comboLiveKernel->setCurrentText(settings->kernel);
+
+    QString dataFilesPath = settings->dataFilesPathArg;
+    if (dataFilesPath.isEmpty()) {
+        dataFilesPath = qt_settings.value("datafiles_path").toString();
+    }
+    if (dataFilesPath.isEmpty()) {
+        SettingsArgsCpp args;
+        const SettingsCpp built = SettingsCppBuilder::buildFromArgs(
+            args,
+            true,
+            QCoreApplication::applicationName().toStdString(),
+            QCoreApplication::organizationName().toStdString());
+        dataFilesPath = QString::fromStdString(built.dataFilesPath);
+    }
+    ui->lineEditDataFilesPath->setText(dataFilesPath);
+
     updateCustomExcludesButton();
     watchExcludesFile();
 }
@@ -389,6 +406,9 @@ void MainWindow::setConnections()
     connect(ui->btnHelp, &QPushButton::clicked, this, &MainWindow::btnHelp_clicked);
     connect(ui->btnNext, &QPushButton::clicked, this, &MainWindow::btnNext_clicked);
     connect(ui->btnSelectSnapshot, &QPushButton::clicked, this, &MainWindow::btnSelectSnapshot_clicked);
+    connect(ui->btnSelectDataFiles, &QPushButton::clicked, this, &MainWindow::btnSelectDataFiles_clicked);
+    connect(ui->lineEditDataFilesPath, &QLineEdit::editingFinished, this,
+            &MainWindow::lineEditDataFilesPath_editingFinished);
     connect(ui->cbCompression, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &MainWindow::cbCompression_currentIndexChanged);
     connect(ui->checkMd5, &QCheckBox::toggled, this, &MainWindow::checkMd5_toggled);
@@ -667,7 +687,8 @@ void MainWindow::handleSelectionPage(const QString &file_name)
 
     ui->labelSummary->setText("\n" + tr("- Snapshot directory:") + " " + settings->snapshotDir + "\n" + "- "
                               + tr("Snapshot name:") + " " + file_name + "\n" + tr("- Kernel to be used:") + " "
-                              + settings->kernel + "\n");
+                              + settings->kernel + "\n" + tr("- Live files data:") + " "
+                              + ui->lineEditDataFilesPath->text().trimmed() + "\n");
     settings->codename = ui->textCodename->text();
     settings->distroVersion = ui->textDistroVersion->text();
     settings->projectName = ui->textProjectName->text();
@@ -882,7 +903,11 @@ void MainWindow::prepareForOutput(const QString &/*file_name*/)
     args.preempt = settings->preempt;
     args.fileArg = settings->snapshotName.toStdString();
     args.maxCoresOverride = static_cast<std::uint32_t>(settings->cores);
-    
+    const QString dataFilesPath = ui->lineEditDataFilesPath->text().trimmed();
+    if (!dataFilesPath.isEmpty()) {
+        args.dataFilesPathArg = dataFilesPath.toStdString();
+    }
+
     // CRITICAL: Save sessionExcludes BEFORE buildFromArgs (which clears it)
     // applyExclusions() on line 776 built settings->sessionExcludes from checkboxes
     // buildFromArgs() clears sessionExcludes on line 198 of settings_cpp_builder.cpp
@@ -1126,6 +1151,22 @@ void MainWindow::btnSelectSnapshot_clicked()
     }
 }
 
+void MainWindow::btnSelectDataFiles_clicked()
+{
+    const QString current = ui->lineEditDataFilesPath->text().trimmed();
+    const QString selected = QFileDialog::getExistingDirectory(
+        this, tr("Select live-files data directory"), current, QFileDialog::ShowDirsOnly);
+    if (!selected.isEmpty()) {
+        ui->lineEditDataFilesPath->setText(selected);
+        qt_settings.setValue("datafiles_path", selected);
+    }
+}
+
+void MainWindow::lineEditDataFilesPath_editingFinished()
+{
+    qt_settings.setValue("datafiles_path", ui->lineEditDataFilesPath->text().trimmed());
+}
+
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
@@ -1364,6 +1405,7 @@ void MainWindow::enableControls(bool enable)
     ui->btnAbout->setEnabled(enable);
     ui->btnHelp->setEnabled(enable);
     ui->btnSelectSnapshot->setEnabled(enable);
+    ui->btnSelectDataFiles->setEnabled(enable);
     ui->btnEditExclude->setEnabled(enable);
     ui->btnRemoveCustomExclude->setEnabled(enable);
     
@@ -1375,7 +1417,8 @@ void MainWindow::enableControls(bool enable)
     ui->comboLiveKernel->setEnabled(enable);
     ui->pushReleaseDate->setEnabled(enable);
     ui->lineEditName->setEnabled(enable);
-    
+    ui->lineEditDataFilesPath->setEnabled(enable);
+
     // Settings page - Exclusion checkboxes
     ui->excludeAll->setEnabled(enable);
     ui->excludeDesktop->setEnabled(enable);

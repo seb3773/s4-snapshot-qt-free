@@ -154,6 +154,15 @@ void SettingsProcessArgsCpp::applyLikeSettingsQt(SettingsCpp &settings, const In
         }
     }
 
+    if (!in.dataFilesPathArg.empty()) {
+        if (DirCpp::exists(in.dataFilesPathArg + "/files") && DirCpp::exists(in.dataFilesPathArg + "/general-files")) {
+            settings.dataFilesPath = DirCpp::absolutePath(in.dataFilesPathArg);
+        } else {
+            warn(callbacks, std::string("Data files directory is invalid: ") + qt_quote(in.dataFilesPathArg));
+            die_failure();
+        }
+    }
+
     if (!in.fileArg.empty()) {
         settings.snapshotName = in.fileArg + (ends_with(in.fileArg, ".iso") ? std::string() : std::string(".iso"));
     } else {

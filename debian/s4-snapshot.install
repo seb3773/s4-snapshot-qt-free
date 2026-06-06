@@ -11,4 +11,5 @@ polkit/*s4-snapshot*.policy	usr/share/polkit-1/actions
 obj-*/helper			usr/lib/s4-snapshot
 polkit/snapshot-lib		usr/lib/s4-snapshot
 scripts/*			usr/share/s4-snapshot/scripts
+data/live-files		usr/share/s4-snapshot
 obj-*/*.qm			usr/share/s4-snapshot/locale

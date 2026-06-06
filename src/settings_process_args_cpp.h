@@ -35,6 +35,7 @@ public:
         std::string compressionLevelArg;
         std::string coresArg;
         std::string throttleArg;
+        std::string dataFilesPathArg;
 
         // Used when fileArg is empty.
         std::string defaultSnapshotName;

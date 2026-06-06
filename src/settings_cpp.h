@@ -23,6 +23,7 @@ struct SettingsCpp
     std::string snapshotDir;
     std::string snapshotName;
     std::string tempDirParent;
+    std::string dataFilesPath;
 
     std::uint64_t freeSpace = 0;
     std::uint64_t freeSpaceWork = 0;

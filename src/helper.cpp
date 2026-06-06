@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "file_cpp.h"
+#include "installed_to_live_cpp.h"
 #include "process_runner.h"
 
 namespace
@@ -64,7 +65,6 @@ void printError(const std::string &message)
          {"/usr/share/s4-snapshot/scripts/copy-initrd-programs",
           "/usr/share/iso-snapshot-cli/scripts/copy-initrd-programs"}},
         {"du", {"/usr/bin/du", "/bin/du"}},
-        {"installed-to-live", {"/usr/sbin/installed-to-live", "/usr/bin/installed-to-live"}},
         {"mkdir", {"/usr/bin/mkdir", "/bin/mkdir"}},
         {"mount", {"/usr/bin/mount", "/bin/mount"}},
         {"mountpoint", {"/usr/bin/mountpoint", "/bin/mountpoint"}},
@@ -134,6 +134,10 @@ void printError(const std::string &message)
 [[nodiscard]] int runAllowedCommand(const std::string &command, const std::vector<std::string> &commandArgs,
                                     const std::string &input = std::string())
 {
+    if (command == "installed-to-live") {
+        return InstalledToLiveCpp::run(commandArgs);
+    }
+
     const auto commandIt = allowedCommands().find(command);
     if (commandIt == allowedCommands().end()) {
         printError(std::string("Command is not allowed: ") + command);

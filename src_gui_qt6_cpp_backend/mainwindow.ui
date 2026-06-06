@@ -7,8 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>984</width>
-    <height>565</height>
+    <height>600</height>
    </rect>
+  </property>
+  <property name="minimumHeight">
+   <number>600</number>
   </property>
   <property name="windowTitle">
    <string>S4 Snapshot</string>
@@ -141,6 +144,33 @@
            <widget class="QLineEdit" name="textOptions">
             <property name="text">
              <string notr="true"/>
+            </property>
+           </widget>
+          </item>
+          <item row="8" column="0">
+           <widget class="QLabel" name="labelDataFilesPath">
+            <property name="toolTip">
+             <string>Directory containing files/ and general-files/ used when building the live system.</string>
+            </property>
+            <property name="text">
+             <string>Live files data:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="8" column="1">
+           <widget class="QLineEdit" name="lineEditDataFilesPath">
+            <property name="toolTip">
+             <string>Directory containing files/ and general-files/ used when building the live system.</string>
+            </property>
+            <property name="text">
+             <string notr="true"/>
+            </property>
+           </widget>
+          </item>
+          <item row="8" column="2">
+           <widget class="QPushButton" name="btnSelectDataFiles">
+            <property name="text">
+             <string>Select…</string>
             </property>
            </widget>
           </item>
@@ -1016,6 +1046,8 @@ li.checked::marker { content: &quot;\2612&quot;; }
   <tabstop>textDistroVersion</tabstop>
   <tabstop>textCodename</tabstop>
   <tabstop>textOptions</tabstop>
+  <tabstop>lineEditDataFilesPath</tabstop>
+  <tabstop>btnSelectDataFiles</tabstop>
   <tabstop>btnAbout</tabstop>
   <tabstop>btnHelp</tabstop>
   <tabstop>btnBack</tabstop>

@@ -7,4 +7,5 @@ polkit/*iso-snapshot*.policy	usr/share/polkit-1/actions
 obj-*/helper			usr/lib/iso-snapshot-cli
 polkit/snapshot-lib		usr/lib/iso-snapshot-cli
 scripts/*                       usr/share/iso-snapshot-cli/scripts
+data/live-files                 usr/share/iso-snapshot-cli
 obj-*/*.qm                      usr/share/iso-snapshot-cli/locale

@@ -1829,6 +1829,16 @@ void Settings::processArgs(
     }
 
 #ifdef CLI_BUILD
+    if (!valueQ("datafiles-path").isEmpty()) {
+        dataFilesPathArg = valueQ("datafiles-path");
+    }
+#else
+    if (!argParser.value("datafiles-path").isEmpty()) {
+        dataFilesPathArg = argParser.value("datafiles-path");
+    }
+#endif
+
+#ifdef CLI_BUILD
     if (!valueQ("file").isEmpty()) {
         const auto fileArg = valueQ("file");
 #else

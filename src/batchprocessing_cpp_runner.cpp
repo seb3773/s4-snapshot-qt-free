@@ -237,8 +237,9 @@ static WorkCppPlanner::SetupEnvEnv compute_setupenv_env_like_qt(const SettingsCp
     env.needInstallCalamares = s.forceInstaller && !WorkCppUtils::checkInstalled("calamares-settings-debian");
 
     // mx-version / lsb-release fallback
-    env.mxVersionFileExistsInUsrLocal = FileCpp::exists("/usr/local/share/live-files/files/etc/mx-version");
-    env.lsbReleaseExistsInUsrLocal = FileCpp::exists("/usr/local/share/live-files/files/etc/lsb-release");
+    const std::string dataFilesPath = s.dataFilesPath.empty() ? std::string("/usr/local/share/live-files") : s.dataFilesPath;
+    env.mxVersionFileExistsInUsrLocal = FileCpp::exists(dataFilesPath + "/files/etc/mx-version");
+    env.lsbReleaseExistsInUsrLocal = FileCpp::exists(dataFilesPath + "/files/etc/lsb-release");
 
     // setupBindRootOverlay pre-probe (mountpoints)
     const std::string overlayBase = std::string("/run/") + applicationName + "/bind-root-overlay";

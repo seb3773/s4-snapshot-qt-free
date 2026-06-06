@@ -199,6 +199,7 @@ public:
     QString kernel;
     QString projectName;
     QString releaseDate;
+    QString dataFilesPathArg;
     bool makeMd5sum {};
     bool makeSha512sum {};
     bool resetAccounts {};

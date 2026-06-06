@@ -64,6 +64,13 @@ bool SettingsCheckConfigurationCpp::checkConfigurationLikeSettingsQt(const Setti
         return false;
     }
 
+    if (!settings.dataFilesPath.empty()
+        && (!FileCpp::isDir(settings.dataFilesPath + "/files")
+            || !FileCpp::isDir(settings.dataFilesPath + "/general-files"))) {
+        cb_critical(cb, std::string("Live data files directory is invalid: ") + settings.dataFilesPath);
+        return false;
+    }
+
     {
         bool hasInvalid = false;
         for (char ch : settings.snapshotName) {

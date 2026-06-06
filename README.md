@@ -198,6 +198,9 @@ sudo iso-snapshot-cli --file my-system.iso --compression zstd
 # Custom kernel
 sudo iso-snapshot-cli --file my-system.iso --kernel 6.1.0-18-amd64
 
+# Use an alternate live-files data directory
+sudo iso-snapshot-cli --file my-system.iso --datafiles-path /path/to/live-files
+
 # show help
 iso-snapshot-cli --help
 
@@ -332,6 +335,23 @@ Backend tools: all backend tools have been ported to pure C++:
 - `string_cpp.cpp` - stringq manipulation
 - `process_runner.cpp` - process execution
 - `command_runner.cpp` - cmd execution
+- `installed_to_live_cpp.cpp` - native C++ implementation of the `installed-to-live` workflow used by `setupEnv`
+
+### installed-to-live C++ integration
+
+The backend no longer depends on the external `/usr/sbin/installed-to-live` script from `s4-remaster` for the snapshot preparation path. Calls to `installed-to-live` are intercepted by the root helper and executed by `InstalledToLiveCpp`, a Qt-free C++ implementation of the subset used by S4 Snapshot.
+
+Implemented commands include `start`, `bind=`, `empty=`, `live-files`, `general-files`, `general`, `passwd`, `version-file`, `adjtime`, `grubdefault`, `resumedisable`, `tdmnoautologin`, `sddmnoautologin`, `read-only`, `read-write`, `cleanup`, and `exclude`. This removes the runtime dependency on the script while keeping the existing planner flow and root helper elevation model.
+
+The live file templates are now vendored in `data/live-files/` and can also be overridden with `--datafiles-path <path>`. The expected directory layout is:
+
+```
+live-files/
+├── files/
+└── general-files/
+```
+
+The backend resolves live data files in this order: explicit `--datafiles-path`, vendored project data (`data/live-files/`), installed package paths under `/usr/share`, then legacy paths under `/usr/local/share/live-files` and `/usr/share/live-files`. This keeps local testing flexible while preparing for a self-contained package.
 
 **validation**:
 - `settings_validation_cpp.cpp` - configuration validation

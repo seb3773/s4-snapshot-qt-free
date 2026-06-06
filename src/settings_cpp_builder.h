@@ -13,6 +13,7 @@ struct SettingsArgsCpp
     bool overrideSize = false;
     bool preempt = false;
     std::string fileArg;
+    std::string dataFilesPathArg;
     std::uint32_t maxCoresOverride = 0;
 };
 
