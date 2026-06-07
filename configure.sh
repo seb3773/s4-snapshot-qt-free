@@ -92,19 +92,19 @@ if ! check_command lslogins; then
     echo -e "${YELLOW}⚠${NC} lslogins not found (usually in util-linux)"
 fi
 
-# Vendored live ecosystem data
+# Build-time asset sources (embedded into binaries at compile time; not installed on target systems)
 if ! [ -d "data/live-files/files" ] || ! [ -d "data/live-files/general-files" ]; then
-    echo -e "${RED}✗${NC} vendored live-files data not found"
-    MISSING_DEPS+=("data/live-files")
+    echo -e "${RED}✗${NC} build-time live-files sources not found (data/live-files)"
+    MISSING_DEPS+=("data/live-files (build source)")
 else
-    echo -e "${GREEN}✓${NC} vendored live-files data found"
+    echo -e "${GREEN}✓${NC} build-time live-files sources found"
 fi
 
-if ! [ -f "data/s4-iso-templates/iso-template.tar.gz" ] || ! [ -f "data/s4-iso-templates/template-initrd.gz" ]; then
-    echo -e "${RED}✗${NC} vendored ISO templates not found"
-    MISSING_DEPS+=("data/s4-iso-templates")
+if ! [ -d "data/iso-templates/iso-template" ] || ! [ -d "data/iso-templates/template-initrd" ]; then
+    echo -e "${RED}✗${NC} build-time ISO template trees not found (data/iso-templates)"
+    MISSING_DEPS+=("data/iso-templates (build source)")
 else
-    echo -e "${GREEN}✓${NC} vendored ISO templates found"
+    echo -e "${GREEN}✓${NC} build-time ISO template trees found"
 fi
 
 echo ""

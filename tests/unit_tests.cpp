@@ -80,6 +80,7 @@
 #include "../src/batchprocessing_cpp_planner.h"
 #include "../src/batchprocessing_cpp_runner.h"
 #include "../src/batchprocessing_orchestration_qt_plan_oracle.h"
+#include "../src/embedded/embedded_assets.h"
 #include "../src/settings_exclusions_cpp.h"
 #include "../src/settings_space_cpp.h"
 #include "../src/settings_validation_cpp.h"
@@ -7554,7 +7555,7 @@ static void test_batchprocessing_orchestration_plan_qt_oracle_vs_cpp_planner_bas
     qtEnv.copyNewIso_sysvinitInitExists = true;
     qtEnv.copyNewIso_systemdSystemdExists = true;
     qtEnv.copyNewIso_initrdTempDirValid = true;
-    qtEnv.copyNewIso_initrdTempDirPath = QStringLiteral("/tmp/initrd");
+    qtEnv.copyNewIso_initrdTempDirPath = QStringLiteral("/tmp/work/_embedded/initrd-build");
     qtEnv.copyNewIso_loggedInUserName = QStringLiteral("user");
     qtEnv.copyNewIso_applicationName = QStringLiteral("s4-snapshot");
 
@@ -7608,11 +7609,8 @@ static void test_batchprocessing_orchestration_plan_qt_oracle_vs_cpp_planner_bas
     cppEnv.setupEnvEnv.cleanUp_started = true;
     cppEnv.setupEnvEnv.cleanUp_done = false;
     cppEnv.setupEnvEnv.cleanUp_cleanupConfExists = false;
-    cppEnv.copyNewIsoEnv.isoTemplateMultiExists = true;
-    cppEnv.copyNewIsoEnv.sysvinitInitExists = true;
-    cppEnv.copyNewIsoEnv.systemdSystemdExists = true;
     cppEnv.copyNewIsoEnv.initrdTempDirValid = true;
-    cppEnv.copyNewIsoEnv.initrdTempDirPath = "/tmp/initrd";
+    cppEnv.copyNewIsoEnv.initrdTempDirPath = "/tmp/work/_embedded/initrd-build";
     cppEnv.copyNewIsoEnv.loggedInUserName = "user";
     cppEnv.copyNewIsoEnv.applicationName = "s4-snapshot";
     cppEnv.createIsoEnv.useUnbuffer = qtEnv.createIsoEnv.useUnbuffer;
@@ -7698,11 +7696,7 @@ static void test_work_copynewiso_plan_qt_oracle_vs_cpp_planner_basic_multiinit_a
     cppSettings.releaseDate = "today";
     cppSettings.codename = "code";
     cppSettings.bootOptions = "quiet";
-
     WorkCopyNewIsoQtPlanOracle::Env qtEnv;
-    qtEnv.isoTemplateMultiExists = true;
-    qtEnv.sysvinitInitExists = true;
-    qtEnv.systemdSystemdExists = true;
     qtEnv.initrdReleaseExists = true;
     qtEnv.initrdReleaseIsFile = true;
     qtEnv.initrdReleaseDestExists = true;
@@ -7710,14 +7704,11 @@ static void test_work_copynewiso_plan_qt_oracle_vs_cpp_planner_basic_multiinit_a
     qtEnv.initrd_releaseIsFile = true;
     qtEnv.initrd_releaseDestExists = false;
     qtEnv.initrdTempDirValid = true;
-    qtEnv.initrdTempDirPath = QStringLiteral("/tmp/initrd_dir_X");
+    qtEnv.initrdTempDirPath = QStringLiteral("/tmp/work/_embedded/initrd-build");
     qtEnv.loggedInUserName = QStringLiteral("alice");
     qtEnv.applicationName = QStringLiteral("s4-snapshot");
 
     WorkCppPlanner::CopyNewIsoEnv cppEnv;
-    cppEnv.isoTemplateMultiExists = true;
-    cppEnv.sysvinitInitExists = true;
-    cppEnv.systemdSystemdExists = true;
     cppEnv.initrdReleaseExists = true;
     cppEnv.initrdReleaseIsFile = true;
     cppEnv.initrdReleaseDestExists = true;
@@ -7725,7 +7716,7 @@ static void test_work_copynewiso_plan_qt_oracle_vs_cpp_planner_basic_multiinit_a
     cppEnv.initrd_releaseIsFile = true;
     cppEnv.initrd_releaseDestExists = false;
     cppEnv.initrdTempDirValid = true;
-    cppEnv.initrdTempDirPath = "/tmp/initrd_dir_X";
+    cppEnv.initrdTempDirPath = "/tmp/work/_embedded/initrd-build";
     cppEnv.loggedInUserName = "alice";
     cppEnv.applicationName = "s4-snapshot";
 
@@ -7755,19 +7746,12 @@ static void test_work_copynewiso_plan_qt_oracle_vs_cpp_planner_tempdir_invalid_a
     cppSettings.releaseDate = "today";
     cppSettings.codename = "code";
     cppSettings.bootOptions = "quiet";
-
     WorkCopyNewIsoQtPlanOracle::Env qtEnv;
-    qtEnv.isoTemplateMultiExists = false;
-    qtEnv.sysvinitInitExists = false;
-    qtEnv.systemdSystemdExists = false;
     qtEnv.initrdTempDirValid = false;
     qtEnv.initrdTempDirPath = QStringLiteral("/tmp/ignored");
     qtEnv.applicationName = QStringLiteral("s4-snapshot");
 
     WorkCppPlanner::CopyNewIsoEnv cppEnv;
-    cppEnv.isoTemplateMultiExists = false;
-    cppEnv.sysvinitInitExists = false;
-    cppEnv.systemdSystemdExists = false;
     cppEnv.initrdTempDirValid = false;
     cppEnv.initrdTempDirPath = "/tmp/ignored";
     cppEnv.applicationName = "s4-snapshot";
@@ -10018,6 +10002,81 @@ static void test_qlibraryinfo_translationspath_vs_qtlibraryinfocpp()
         const std::string cpp = QtLibraryInfoCpp::translationsPath();
         check(qt.toStdString() == cpp, "TranslationsPath must respect QT_INSTALL_TRANSLATIONS override");
     }
+}
+
+static void test_work_copynewiso_plan_embedded_mode_uses_native_extract_commands()
+{
+    SettingsCpp settings;
+    settings.workDir = "/tmp/work";
+    settings.kernel = "6.1.0-test";
+    settings.projectName = "proj";
+    settings.distroVersion = "1.0";
+    settings.fullDistroName = "proj_1.0";
+    settings.releaseDate = "today";
+    settings.codename = "code";
+    settings.bootOptions = "quiet";
+    WorkCppPlanner::CopyNewIsoEnv env;
+    env.initrdTempDirValid = true;
+    env.initrdTempDirPath = "/tmp/work/_embedded/initrd-build";
+    env.loggedInUserName = "alice";
+    env.applicationName = "s4-snapshot";
+
+    const WorkCppPlan plan = WorkCppPlanner::planCopyNewIso(settings, env);
+    bool sawEmbedIso = false;
+    bool sawEmbedInitrd = false;
+    for (const WorkCppPlanStep &st : plan.steps) {
+        if (!std::holds_alternative<WorkCppPlanStep::RunCommandLine>(st.payload)) {
+            continue;
+        }
+        const std::string cmd = std::get<WorkCppPlanStep::RunCommandLine>(st.payload).command;
+        if (cmd.rfind("EMBED_EXTRACT_ISO_TEMPLATE ", 0) == 0) {
+            sawEmbedIso = true;
+        }
+        if (cmd.rfind("EMBED_POPULATE_INITRD_DIR ", 0) == 0) {
+            sawEmbedInitrd = true;
+        }
+        check(cmd.rfind("tar xf", 0) != 0, "embedded copyNewIso plan must not shell out to tar");
+    }
+    check(sawEmbedIso, "embedded copyNewIso plan must extract iso-template from payload");
+    check(sawEmbedInitrd, "embedded copyNewIso plan must populate initrd from payload");
+}
+
+static void test_embedded_assets_extract_live_files_and_iso_templates_basic()
+{
+    const EmbeddedPayloadView livePayload = EmbeddedAssets::liveFilesPayload();
+    check(livePayload.data != nullptr, "embedded live-files payload must be present");
+    check(livePayload.compressed_size > 0, "embedded live-files compressed size must be > 0");
+    check(livePayload.uncompressed_size > 0, "embedded live-files uncompressed size must be > 0");
+
+    const EmbeddedPayloadView isoPayload = EmbeddedAssets::isoTemplatesPayload();
+    check(isoPayload.data != nullptr, "embedded iso-templates payload must be present");
+    check(isoPayload.compressed_size > 0, "embedded iso-templates compressed size must be > 0");
+    check(isoPayload.uncompressed_size > 0, "embedded iso-templates uncompressed size must be > 0");
+
+    QTemporaryDir liveDir;
+    check(liveDir.isValid(), "embedded assets live-files temp dir must be valid");
+    const EmbeddedAssets::Result liveResult = EmbeddedAssets::extractLiveFiles(liveDir.path().toStdString());
+    check(liveResult.ok, ("embedded live-files extract failed: " + liveResult.error).c_str());
+    check(QFileInfo::exists(liveDir.filePath("files/etc/fstab")),
+          "embedded live-files must extract files/etc/fstab");
+    check(QFileInfo::exists(liveDir.filePath("general-files/etc/hostname")),
+          "embedded live-files must extract general-files/etc/hostname");
+
+    QTemporaryDir isoDir;
+    check(isoDir.isValid(), "embedded assets iso-template temp dir must be valid");
+    const EmbeddedAssets::Result isoResult = EmbeddedAssets::extractIsoTemplateTree(isoDir.path().toStdString());
+    check(isoResult.ok, ("embedded iso-template extract failed: " + isoResult.error).c_str());
+    check(QFileInfo::exists(isoDir.filePath("boot/grub/grub.cfg")),
+          "embedded iso-template must extract boot/grub/grub.cfg");
+    check(QFileInfo::exists(isoDir.filePath("antiX/.keep")),
+          "embedded iso-template must extract antiX/.keep");
+
+    QTemporaryDir initrdDir;
+    check(initrdDir.isValid(), "embedded assets template-initrd temp dir must be valid");
+    const EmbeddedAssets::Result initrdResult = EmbeddedAssets::extractTemplateInitrd(initrdDir.path().toStdString());
+    check(initrdResult.ok, ("embedded template-initrd extract failed: " + initrdResult.error).c_str());
+    check(QFileInfo::exists(initrdDir.filePath("etc/init.d/live-init")),
+          "embedded template-initrd must extract etc/init.d/live-init");
 }
 
 static void test_i18ncli_load_kv_and_translate_basic()
@@ -15434,6 +15493,8 @@ int main(int argc, char **argv)
     test_work_setupEnv_version_and_lsbrelease_writes_qt_vs_cpp_oracle_usr_local_paths_exact();
     test_work_setupEnv_version_and_lsbrelease_writes_qt_vs_cpp_oracle_usr_share_fallback_paths_exact();
     test_work_qt_oracle_vs_work_callbacks_oracle_basic_messages();
+    test_work_copynewiso_plan_embedded_mode_uses_native_extract_commands();
+    test_embedded_assets_extract_live_files_and_iso_templates_basic();
     test_i18ncli_load_kv_and_translate_basic();
     test_qtranslator_translate_vs_qmtranslatorcpp_loadfile();
     test_tr_qobject_qm_qt_oracle_vs_cpp_qm_loader_fr();

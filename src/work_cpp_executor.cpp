@@ -1,32 +1,45 @@
 #include "work_cpp_executor.h"
 
 #include <chrono>
-#include <iostream>
-#include <unistd.h>
+
+#include "embedded/embedded_assets.h"
+#include "embedded/embedded_assets_runtime.h"
 #include "datetime_cpp.h"
 #include "dir_cpp.h"
 #include "file_cpp.h"
+#include "command_runner.h"
 #include "process_runner.h"
 #include "work_cpp_utils.h"
 #ifdef UNIT_TESTS
 #include "tempdir.h"
 #endif
 
-static std::string getCurrentDir() {
-    char buf[4096];
-    if (getcwd(buf, sizeof(buf))) {
-        return std::string(buf);
+namespace {
+
+std::string application_name_for_cleanup(const WorkCppExecutor::Callbacks &cb)
+{
+    if (!cb.applicationName.empty()) {
+        return cb.applicationName;
     }
-    return "<unknown>";
+#ifdef UNIT_TESTS
+    return "unit_tests";
+#else
+    return "s4-snapshot";
+#endif
+}
+
+} // namespace
+
+static std::string strip_shell_quotes(const std::string &value)
+{
+    if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+        return value.substr(1, value.size() - 2);
+    }
+    return value;
 }
 
 WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Callbacks &cb)
 {
-    std::cerr << "=== WorkCppExecutor::run() START ===" << std::endl;
-    std::cerr << "DEBUG: Callbacks - message: " << (cb.message ? "SET" : "NULL")
-              << ", messageBox: " << (cb.messageBox ? "SET" : "NULL") << std::endl;
-    std::cerr << "DEBUG: Plan has " << plan.steps.size() << " steps" << std::endl;
-    
     Result r;
     CommandRunner::Result lastProcAsRootResult;
     bool lastRunCommandLineSuccess = true;  // Track last RunCommandLine result
@@ -34,10 +47,14 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
     // Track start time for elapsed time calculation
     const auto startTime = std::chrono::steady_clock::now();
 
-    int stepNum = 0;
     for (const WorkCppPlanStep &st : plan.steps) {
-        stepNum++;
-        std::cerr << "DEBUG: Executing step " << stepNum << "/" << plan.steps.size() << std::endl;
+        if (EmbeddedAssetsRuntime::signalStopRequested()) {
+            (void)EmbeddedAssetsRuntime::handleSignalStopIfRequested();
+            r.aborted = true;
+            r.abortReason = "Operation interrupted";
+            return r;
+        }
+
         if (std::holds_alternative<WorkCppPlanStep::Message>(st.payload)) {
             if (cb.message) {
                 cb.message(std::get<WorkCppPlanStep::Message>(st.payload).text);
@@ -106,18 +123,18 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
                             // For the C++ implementation, we need to execute cleanup steps inline
                             // This matches the Qt behavior of calling cleanUp() when installed-to-live fails
                             
-                            // Execute cleanup operations (matching Qt's cleanUp() behavior when started==false)
-                            const std::string snapshotLib = "/usr/lib/unit_tests/snapshot-lib";
-                            const std::string elevateTool = CommandRunner::elevationTool();  // This generates a hook event
-                            
-                            (void)CommandRunner::run(elevateTool + " " + snapshotLib + " chown_conf", CommandRunner::QuietMode::Yes);
-                            // initrd_dir.remove() - generates TempDir::remove event
-                            #ifdef UNIT_TESTS
+                            const std::string appName = application_name_for_cleanup(cb);
+                            const std::string snapshotLib = "/usr/lib/" + appName + "/snapshot-lib";
+                            const std::string elevateTool = CommandRunner::elevationTool();
+
+                            (void)CommandRunner::run(elevateTool + " " + snapshotLib + " chown_conf",
+                                                     CommandRunner::QuietMode::Yes);
+#ifdef UNIT_TESTS
                             (void)TempDir::removeRecursivelyForTests("<tempdir>");
-                            #endif
-                            // cleanupBindRootOverlay() - calls elevationTool() again, then runs cleanup_overlay
-                            const std::string elevateTool2 = CommandRunner::elevationTool();  // This generates another hook event
-                            (void)CommandRunner::run(elevateTool2 + " " + snapshotLib + " cleanup_overlay unit_tests", CommandRunner::QuietMode::Yes);
+#endif
+                            const std::string elevateTool2 = CommandRunner::elevationTool();
+                            (void)CommandRunner::run(elevateTool2 + " " + snapshotLib + " cleanup_overlay " + appName,
+                                                     CommandRunner::QuietMode::Yes);
                             
                             r.aborted = true;
                             r.abortReason = "installed-to-live command failed - cleanUp called";
@@ -186,55 +203,35 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
                                     
                                     // Execute: cd folder && md5sum filename > filename.md5
                                     const std::string cmd = "cd \"" + folder + "\" && md5sum \"" + filename + "\" > \"" + filename + ".md5\"";
-                                    const bool cmdSuccess = CommandRunner::run(cmd, c.quietYes ? CommandRunner::QuietMode::Yes : CommandRunner::QuietMode::No);
-                                    if (!cmdSuccess && !c.quietYes) {
-                                        std::cerr << "WARNING: MD5 checksum command failed: " << cmd << std::endl;
-                                    }
+                                    (void)CommandRunner::run(cmd, c.quietYes ? CommandRunner::QuietMode::Yes : CommandRunner::QuietMode::No);
                                 }
                             } else {
-                                const std::string openInitrdPrefix = "OPEN_INITRD ";
-                                if (c.command.rfind(openInitrdPrefix, 0) == 0) {
-                                    // OPEN_INITRD <file> <dir>
-                                    const std::string params = c.command.substr(openInitrdPrefix.size());
-                                    const std::size_t space = params.find(' ');
-                                    if (space != std::string::npos) {
-                                        const std::string initrdFile = params.substr(0, space);
-                                        const std::string targetDir = params.substr(space + 1);
-                                        
-                                        // Create target directory
-                                        DirCpp d;
-                                        (void)d.mkpath(targetDir);
-                                        
-                                        // Set permissions: chmod a+rx targetDir
-                                        (void)CommandRunner::run("chmod a+rx \"" + targetDir + "\"", CommandRunner::QuietMode::Yes);
-                                        
-                                        // Change to target directory and extract
-                                        (void)DirCpp::setCurrent(targetDir);
-                                        
-                                        // Extract: gunzip -c initrdFile | cpio -idum
-                                        const std::string extractCmd = "gunzip -c \"" + initrdFile + "\" | cpio -idum";
-                                        (void)CommandRunner::run(extractCmd, c.quietYes ? CommandRunner::QuietMode::Yes : CommandRunner::QuietMode::No);
+                                const std::string embedIsoPrefix = "EMBED_EXTRACT_ISO_TEMPLATE ";
+                                if (c.command.rfind(embedIsoPrefix, 0) == 0) {
+                                    const std::string dest = strip_shell_quotes(c.command.substr(embedIsoPrefix.size()));
+                                    const EmbeddedAssets::Result extract = EmbeddedAssets::extractIsoTemplateTree(dest);
+                                    if (!extract.ok) {
+                                        r.aborted = true;
+                                        r.abortReason = std::string("embedded iso-template extraction failed: ") + extract.error;
+                                        return r;
                                     }
                                 } else {
-                                    // DEBUG: Log command being executed
-                                    std::cerr << "DEBUG [RunCommandLine]: Executing shell command: " << c.command << std::endl;
-                                    std::cerr << "DEBUG [RunCommandLine]: Current directory: " << getCurrentDir() << std::endl;
-                                    
-                                    // Execute command - match Qt behavior: some commands are allowed to fail
-                                    // The Qt implementation uses runCommandLine() which returns bool but doesn't abort on failure
-                                    // Commands like "mountpoint /boot" can fail (non-zero exit) when /boot is not a separate partition
-                                    // This is EXPECTED behavior - the code checks the return value and continues accordingly
-                                    // See work.cpp:888 - if (runCommandLine("mountpoint /boot")) { bind_boot = "bind=/boot "; }
-                                    lastRunCommandLineSuccess = CommandRunner::run(c.command, c.quietYes ? CommandRunner::QuietMode::Yes : CommandRunner::QuietMode::No);
-                                    
-                                    // DEBUG: Log result
-                                    std::cerr << "DEBUG [RunCommandLine]: Command success: " << lastRunCommandLineSuccess << std::endl;
-                                    
-                                    // Log for debugging but DO NOT ABORT - specific commands will be checked via CHECK_RESULT
-                                    if (!lastRunCommandLineSuccess && !c.quietYes) {
-                                        std::cerr << "DEBUG: Command returned non-zero (this may be expected): " << c.command << std::endl;
+                                const std::string embedInitrdPrefix = "EMBED_POPULATE_INITRD_DIR ";
+                                if (c.command.rfind(embedInitrdPrefix, 0) == 0) {
+                                    const std::string dest = strip_shell_quotes(c.command.substr(embedInitrdPrefix.size()));
+                                    (void)DirCpp().mkpath(dest);
+                                    (void)CommandRunner::run("chmod a+rx \"" + dest + "\"", CommandRunner::QuietMode::Yes);
+                                    const EmbeddedAssets::Result extract = EmbeddedAssets::extractTemplateInitrd(dest);
+                                    if (!extract.ok) {
+                                        r.aborted = true;
+                                        r.abortReason = std::string("embedded template-initrd extraction failed: ") + extract.error;
+                                        return r;
                                     }
-                                    // Continue execution - specific commands will be checked via CHECK_RESULT steps
+                                } else {
+                                    lastRunCommandLineSuccess = CommandRunner::run(c.command,
+                                                                                   c.quietYes ? CommandRunner::QuietMode::Yes
+                                                                                              : CommandRunner::QuietMode::No);
+                                }
                                 }
                             }
                         }
@@ -247,34 +244,9 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
 
         if (std::holds_alternative<WorkCppPlanStep::ProcAsRoot>(st.payload)) {
             const auto &c = std::get<WorkCppPlanStep::ProcAsRoot>(st.payload);
-            
-            // DEBUG: Log command being executed
-            std::cerr << "DEBUG [ProcAsRoot]: Executing: " << c.program << std::endl;
-            for (size_t i = 0; i < c.args.size(); ++i) {
-                std::cerr << "  arg[" << i << "]: " << c.args[i] << std::endl;
-            }
-            
-            // Execute root command and store result for potential use by subsequent steps
-            // Match Qt behavior: procAsRoot() is called and result is stored, but execution continues
-            // The Qt code checks results explicitly when needed (e.g., work.cpp:486-489 for mountpoint)
-            // Commands like mountpoint can fail (non-zero exit) and this is EXPECTED - the code checks
-            // the result and decides what to do (e.g., whether to run umount)
-            // Only specific commands that are truly critical will cause abort via CHECK_RESULT steps
             lastProcAsRootResult = CommandRunner::procAsRoot(c.program, c.args, std::string(),
-                                           c.quietYes ? CommandRunner::QuietMode::Yes : CommandRunner::QuietMode::No);
-            
-            // DEBUG: Log result
-            std::cerr << "DEBUG [ProcAsRoot]: Result - started: " << lastProcAsRootResult.started
-                     << " normalExit: " << lastProcAsRootResult.normalExit
-                     << " exitCode: " << lastProcAsRootResult.exitCode << std::endl;
-            if (!lastProcAsRootResult.mergedText.empty()) {
-                std::cerr << "DEBUG [ProcAsRoot]: Output (first 500 chars): "
-                         << lastProcAsRootResult.mergedText.substr(0, 500) << std::endl;
-            }
-            
-            // Do NOT abort on command failure here - match Qt behavior exactly
-            // The Qt implementation stores the result and continues execution
-            // Specific failure handling is done via CHECK_RESULT steps in the plan
+                                                             c.quietYes ? CommandRunner::QuietMode::Yes
+                                                                        : CommandRunner::QuietMode::No);
             continue;
         }
 
@@ -305,26 +277,14 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
 
         if (std::holds_alternative<WorkCppPlanStep::Mkpath>(st.payload)) {
             const auto &c = std::get<WorkCppPlanStep::Mkpath>(st.payload);
-            std::cerr << "DEBUG [Mkpath]: Creating directory: " << c.path << std::endl;
-            std::cerr << "DEBUG [Mkpath]: Current directory: " << getCurrentDir() << std::endl;
             DirCpp d;
-            const bool success = d.mkpath(c.path);
-            std::cerr << "DEBUG [Mkpath]: Success: " << success << std::endl;
-            // Verify it was created
-            if (DirCpp::exists(c.path)) {
-                std::cerr << "DEBUG [Mkpath]: Directory exists after creation" << std::endl;
-            } else {
-                std::cerr << "DEBUG [Mkpath]: WARNING - Directory does NOT exist after mkpath!" << std::endl;
-            }
+            (void)d.mkpath(c.path);
             continue;
         }
 
         if (std::holds_alternative<WorkCppPlanStep::Chdir>(st.payload)) {
             const auto &c = std::get<WorkCppPlanStep::Chdir>(st.payload);
-            std::cerr << "DEBUG [Chdir]: Changing directory from " << getCurrentDir()
-                     << " to " << c.path << std::endl;
-            const bool success = DirCpp::setCurrent(c.path);
-            std::cerr << "DEBUG [Chdir]: Success: " << success << " - Now in: " << getCurrentDir() << std::endl;
+            (void)DirCpp::setCurrent(c.path);
             continue;
         }
 

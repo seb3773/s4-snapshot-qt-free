@@ -74,10 +74,6 @@ private slots:
     void btnHelp_clicked();
     void btnNext_clicked();
     void btnSelectSnapshot_clicked();
-    void btnSelectDataFiles_clicked();
-    void lineEditDataFilesPath_editingFinished();
-    void btnSelectTemplates_clicked();
-    void lineEditTemplatesPath_editingFinished();
     void cbCompression_currentIndexChanged();
     void checkMd5_toggled(bool checked);
     void checkSha512_toggled(bool checked);
@@ -138,7 +134,6 @@ private:
     void listUsedSpace();
     void loadSettings();
     void prepareForOutput(const QString &file_name);
-    [[nodiscard]] bool isTemplatesPathValid(const QString &path) const;
     bool hasCustomExcludes() const;
     enum class ExcludesChoice { None, ShowDiff, KeepCustom, UseUpdatedDefault };
     [[nodiscard]] bool isSourceExcludesNewer(QString &diffOutput) const;

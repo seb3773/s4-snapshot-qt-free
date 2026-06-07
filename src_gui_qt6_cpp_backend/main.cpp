@@ -132,12 +132,6 @@ static void setupParser(QCommandLineParser &parser)
     parser.addOption(QCommandLineOption(QStringList {QStringLiteral("w"), QStringLiteral("workdir")},
                                         QObject::tr("Work directory"),
                                         QStringLiteral("path")));
-    parser.addOption(QCommandLineOption(QStringList {QStringLiteral("datafiles-path")},
-                                        QStringLiteral("Path to live-files data directory"),
-                                        QStringLiteral("path")));
-    parser.addOption(QCommandLineOption(QStringList {QStringLiteral("templates-path")},
-                                        QStringLiteral("Path to ISO templates directory"),
-                                        QStringLiteral("path")));
     parser.addOption(QCommandLineOption(QStringList {QStringLiteral("x"), QStringLiteral("exclude")},
                                         QObject::tr("Exclude main folders, valid choices: Desktop, Documents, Downloads, Flatpaks, Music, Networks, Pictures, Steam, Videos, VirtualBox. Use the option one time for each item you want to exclude"),
                                         QObject::tr("one item")));
@@ -220,8 +214,6 @@ int main(int argc, char *argv[])
                       AppTranslatorCpp::tQt("QObject", "Throttle the I/O input rate by the given percentage. This can be used to reduce the I/O and CPU consumption of Mksquashfs."),
                       "number"});
     parser.addOption({{"w", "workdir"}, AppTranslatorCpp::tQt("QObject", "Work directory"), "path"});
-    parser.addOption({{"datafiles-path"}, "Path to live-files data directory", "path"});
-    parser.addOption({{"templates-path"}, "Path to ISO templates directory", "path"});
     parser.addOption({{"x", "exclude"},
                       AppTranslatorCpp::tQt("QObject", "Exclude main folders, valid choices: Desktop, Documents, Downloads, Flatpaks, Music, Networks, Pictures, Steam, Videos, VirtualBox. Use the option one time for each item you want to exclude"),
                       AppTranslatorCpp::tQt("QObject", "one item")});

@@ -71,13 +71,6 @@ bool SettingsCheckConfigurationCpp::checkConfigurationLikeSettingsQt(const Setti
         return false;
     }
 
-    if (!settings.templatesPath.empty()
-        && (!FileCpp::exists(settings.templatesPath + "/iso-template.tar.gz")
-            || !FileCpp::exists(settings.templatesPath + "/template-initrd.gz"))) {
-        cb_critical(cb, std::string("ISO templates directory is invalid: ") + settings.templatesPath);
-        return false;
-    }
-
     {
         bool hasInvalid = false;
         for (char ch : settings.snapshotName) {

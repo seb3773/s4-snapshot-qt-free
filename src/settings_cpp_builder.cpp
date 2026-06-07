@@ -43,59 +43,6 @@ static std::string clean_path_std(const std::string &p)
     return DirCpp::cleanPath(p);
 }
 
-static std::string resolve_data_files_path_std(const std::string &customPath, const std::string &appName)
-{
-    const std::string custom = trim_quotes_like_settings_cpp(customPath);
-    if (!custom.empty()) {
-        return clean_path_std(custom);
-    }
-
-    const std::vector<std::string> candidates = {
-#ifdef PROJECT_SOURCE_DIR
-        std::string(PROJECT_SOURCE_DIR) + "/data/live-files",
-#endif
-        clean_path_std("data/live-files"),
-        std::string("/usr/share/") + appName + "/live-files",
-        "/usr/share/s4-snapshot/live-files",
-        "/usr/local/share/live-files",
-        "/usr/share/live-files",
-    };
-
-    for (const std::string &candidate : candidates) {
-        if (DirCpp::exists(candidate)) {
-            return clean_path_std(candidate);
-        }
-    }
-
-    return clean_path_std(std::string("/usr/share/") + appName + "/live-files");
-}
-
-static std::string resolve_templates_path_std(const std::string &customPath, const std::string &appName)
-{
-    const std::string custom = trim_quotes_like_settings_cpp(customPath);
-    if (!custom.empty()) {
-        return clean_path_std(custom);
-    }
-
-    const std::vector<std::string> candidates = {
-#ifdef PROJECT_SOURCE_DIR
-        std::string(PROJECT_SOURCE_DIR) + "/data/s4-iso-templates",
-#endif
-        clean_path_std("data/s4-iso-templates"),
-        std::string("/usr/share/") + appName + "/s4-iso-templates",
-        "/usr/share/s4-snapshot/s4-iso-templates",
-        "/usr/lib/iso-template",
-    };
-
-    for (const std::string &candidate : candidates) {
-        if (DirCpp::exists(candidate)) {
-            return clean_path_std(candidate);
-        }
-    }
-
-    return clean_path_std(std::string("/usr/share/") + appName + "/s4-iso-templates");
-}
-
 static std::uint32_t to_uint32_like_qstring_toUInt_base10(const std::string &utf8)
 {
     const std::string t = StringCpp::trimmedLikeQStringUtf8(utf8);
@@ -214,8 +161,7 @@ SettingsCpp SettingsCppBuilder::buildFromArgsWithPaths(const SettingsArgsCpp &ar
     out.snapshotDir.clear();
     out.snapshotName.clear();
     out.tempDirParent.clear();
-    out.dataFilesPath = resolve_data_files_path_std(args.dataFilesPathArg, appName);
-    out.templatesPath = resolve_templates_path_std(args.templatesPathArg, appName);
+    out.dataFilesPath.clear();
     out.shutdown = false;
 
     out.makeIsohybrid = false;
@@ -352,7 +298,5 @@ SettingsCpp SettingsCppBuilder::build(const CommandLineParserStd &argParser,
     args.overrideSize = argParser.isSet("override-size");
     args.preempt = argParser.isSet("preempt");
     args.fileArg = argParser.value("file");
-    args.dataFilesPathArg = argParser.value("datafiles-path");
-    args.templatesPathArg = argParser.value("templates-path");
     return buildFromArgs(args, isGuiApp, appName, organizationName);
 }

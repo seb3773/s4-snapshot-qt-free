@@ -1,10 +1,10 @@
 #include "batchprocessing_cpp_runner.h"
 
 #include <cstdlib>
-#include <iostream>
 #include <utility>
 
 #include "batchprocessing_cpp_planner.h"
+#include "embedded/embedded_assets_runtime.h"
 #include "dir_cpp.h"
 #include "file_cpp.h"
 #include "filesystemutils_cpp.h"
@@ -24,7 +24,29 @@ static void cb_debug(const BatchprocessingCppRunner::Callbacks &cb, const std::s
     if (cb.debug) {
         cb.debug(text);
     }
+}
 
+static WorkCppExecutor::Callbacks make_work_callbacks(const BatchprocessingCppRunner::Callbacks &cb,
+                                                    const BatchprocessingCppRunner::Dependencies &deps)
+{
+    WorkCppExecutor::Callbacks wcb;
+    wcb.message = cb.debug;
+    wcb.messageBox = [cb](BoxType /*type*/, const std::string &title, const std::string &text) {
+        cb_debug(cb, title + std::string(" ") + text);
+    };
+    wcb.applicationName = deps.applicationName;
+    return wcb;
+}
+
+static bool abort_if_signal_stop(BatchprocessingCppRunner::Result &out)
+{
+    if (!EmbeddedAssetsRuntime::signalStopRequested()) {
+        return false;
+    }
+    (void)EmbeddedAssetsRuntime::handleSignalStopIfRequested();
+    out.aborted = true;
+    out.abortReason = "Operation interrupted";
+    return true;
 }
 
 static void cb_critical(const BatchprocessingCppRunner::Callbacks &cb, const std::string &text);
@@ -43,6 +65,10 @@ static BatchprocessingCppRunner::Result run_plan_with_runtime_space_check(const 
     BatchprocessingCppRunner::Result out;
 
     for (const BatchprocessingCppPlanStep &st : plan.steps) {
+        if (abort_if_signal_stop(out)) {
+            return out;
+        }
+
         if (std::holds_alternative<BatchprocessingCppPlanStep::Debug>(st.payload)) {
             cb_debug(cb, std::get<BatchprocessingCppPlanStep::Debug>(st.payload).text);
             continue;
@@ -111,12 +137,7 @@ static BatchprocessingCppRunner::Result run_plan_with_runtime_space_check(const 
                         out.abortReason = "BatchprocessingCppRunner missing dependency: runWork";
                         return out;
                     }
-                    WorkCppExecutor::Callbacks wcb;
-                    wcb.message = cb.debug;
-                    wcb.messageBox = [cb](BoxType /*type*/, const std::string &title, const std::string &text) {
-                        cb_debug(cb, title + std::string(" ") + text);
-                    };
-
+                    const WorkCppExecutor::Callbacks wcb = make_work_callbacks(cb, deps);
                     const WorkCppExecutor::Result wr = deps.runWork(p, wcb);
                     if (wr.aborted) {
                         out.aborted = true;
@@ -130,32 +151,19 @@ static BatchprocessingCppRunner::Result run_plan_with_runtime_space_check(const 
             }
 
             cb_debug(cb, std::string("DEBUG: About to run work stage: ") + wp.stage);
-            std::cerr << "DEBUG: About to call deps.runWork() for stage: " << wp.stage << std::endl;
-            
             if (!deps.runWork) {
-                std::cerr << "ERROR: deps.runWork is NULL!" << std::endl;
                 out.aborted = true;
                 out.abortReason = "BatchprocessingCppRunner missing dependency: runWork";
                 return out;
             }
 
-            WorkCppExecutor::Callbacks wcb;
-            wcb.message = cb.debug;
-            wcb.messageBox = [cb](BoxType /*type*/, const std::string &title, const std::string &text) {
-                cb_debug(cb, title + std::string(" ") + text);
-            };
-
-            std::cerr << "DEBUG: Calling deps.runWork() now..." << std::endl;
+            const WorkCppExecutor::Callbacks wcb = make_work_callbacks(cb, deps);
             const WorkCppExecutor::Result wr = deps.runWork(wp.plan, wcb);
-            std::cerr << "DEBUG: deps.runWork() returned: aborted=" << wr.aborted << std::endl;
-            
             if (wr.aborted) {
                 out.aborted = true;
                 out.abortReason = wr.abortReason;
                 return out;
             }
-            
-            std::cerr << "DEBUG: Finished work stage: " << wp.stage << std::endl;
             continue;
         }
 
@@ -287,15 +295,13 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::run(const Batchproces
                                                              const Callbacks &cb,
                                                              const Dependencies &deps)
 {
-    std::cerr << "=== BatchprocessingCppRunner::run() START ===" << std::endl;
-    std::cerr << "DEBUG: Callbacks - debug: " << (cb.debug ? "SET" : "NULL")
-              << ", critical: " << (cb.critical ? "SET" : "NULL") << std::endl;
-    std::cerr << "DEBUG: Dependencies - runWork: " << (deps.runWork ? "SET" : "NULL") << std::endl;
-    std::cerr << "DEBUG: Plan has " << plan.steps.size() << " steps" << std::endl;
-    
     Result out;
 
     for (const BatchprocessingCppPlanStep &st : plan.steps) {
+        if (abort_if_signal_stop(out)) {
+            return out;
+        }
+
         if (std::holds_alternative<BatchprocessingCppPlanStep::Debug>(st.payload)) {
             cb_debug(cb, std::get<BatchprocessingCppPlanStep::Debug>(st.payload).text);
             continue;
@@ -319,12 +325,7 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::run(const Batchproces
                 return out;
             }
 
-            WorkCppExecutor::Callbacks wcb;
-            wcb.message = cb.debug;
-            wcb.messageBox = [cb](BoxType /*type*/, const std::string &title, const std::string &text) {
-                cb_debug(cb, title + std::string(" ") + text);
-            };
-
+            const WorkCppExecutor::Callbacks wcb = make_work_callbacks(cb, deps);
             const WorkCppExecutor::Result wr = deps.runWork(wp.plan, wcb);
             if (wr.aborted) {
                 out.aborted = true;
@@ -350,12 +351,15 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::runFromSettings(Setti
     Result out;
     out.settings = settings;
 
+    BatchprocessingCppRunner::Dependencies runtimeDeps = deps;
+    runtimeDeps.applicationName = applicationName;
+
     BatchprocessingCppPlanner::Env env;
 
     env.checkCompressionOk = settings_check_compression_like_qt(out.settings);
     if (!env.checkCompressionOk) {
         const BatchprocessingCppPlan p = BatchprocessingCppPlanner::planOrchestration(out.settings, env);
-        const Result r = run(p, out.settings, cb, deps);
+        const Result r = run(p, out.settings, cb, runtimeDeps);
         out.aborted = r.aborted;
         out.abortReason = r.abortReason;
         return out;
@@ -369,10 +373,21 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::runFromSettings(Setti
 
     if (!env.checkSnapshotDirOk || !env.checkTempDirOk) {
         const BatchprocessingCppPlan p = BatchprocessingCppPlanner::planOrchestration(out.settings, env);
-        const Result r = run(p, out.settings, cb, deps);
+        const Result r = run(p, out.settings, cb, runtimeDeps);
         out.aborted = r.aborted;
         out.abortReason = r.abortReason;
         return out;
+    }
+
+    {
+        EmbeddedAssetsRuntime::Callbacks ecb;
+        ecb.critical = [&](const std::string &text) { cb_critical(cb, text); };
+        const EmbeddedAssetsRuntime::Result prep = EmbeddedAssetsRuntime::prepareWorkspace(out.settings, ecb);
+        if (!prep.ok) {
+            out.aborted = true;
+            out.abortReason = prep.error;
+            return out;
+        }
     }
 
     // otherExclusions mutates sessionExcludes.
@@ -386,19 +401,8 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::runFromSettings(Setti
     // copyNewIso/createIso env require runtime probing; keep conservative defaults.
     env.copyNewIsoEnv.applicationName = applicationName;
     env.copyNewIsoEnv.loggedInUserName = CommandRunner::loggedInUserName();
-    {
-        const std::string templatesPath = out.settings.templatesPath.empty() ? "/usr/lib/iso-template" : out.settings.templatesPath;
-        env.copyNewIsoEnv.isoTemplateMultiExists = FileCpp::exists(templatesPath + "/iso-template-multi.tar.gz");
-    }
-    env.copyNewIsoEnv.sysvinitInitExists = FileCpp::exists("/usr/lib/sysvinit/init");
-    env.copyNewIsoEnv.systemdSystemdExists = FileCpp::exists("/usr/lib/systemd/systemd");
-    {
-        TempDir initrdTmp("/tmp/s4-snapshot-initrd-XXXXXXXX");
-        env.copyNewIsoEnv.initrdTempDirValid = initrdTmp.isValid();
-        env.copyNewIsoEnv.initrdTempDirPath = initrdTmp.path();
-        // temp dir will be auto-removed at end of scope; plan uses it for messages only.
-        initrdTmp.setAutoRemove(true);
-    }
+    env.copyNewIsoEnv.initrdTempDirPath = EmbeddedAssetsRuntime::initrdBuildDir(out.settings.workDir);
+    env.copyNewIsoEnv.initrdTempDirValid = !env.copyNewIsoEnv.initrdTempDirPath.empty();
     env.copyNewIsoEnv.initrdReleaseExists = FileCpp::exists("/etc/initrd-release");
     env.copyNewIsoEnv.initrdReleaseIsFile = FileCpp::isFile("/etc/initrd-release");
     env.copyNewIsoEnv.initrdReleaseDestExists = false;
@@ -414,11 +418,16 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::runFromSettings(Setti
     env.createIsoEnv.bindRootPath = std::string("/run/") + applicationName + "/bind-root-overlay/root";
 
     const BatchprocessingCppPlan plan = BatchprocessingCppPlanner::planOrchestration(out.settings, env);
-    const Result r = run_plan_with_runtime_space_check(plan, out.settings, applicationName, cb, deps, &tmp);
+    const Result r = run_plan_with_runtime_space_check(plan, out.settings, applicationName, cb, runtimeDeps, &tmp);
     out.aborted = r.aborted;
     out.abortReason = r.abortReason;
 
-    // Keep tempdir alive for the duration of the run (scope).
+    if (!out.aborted) {
+        (void)EmbeddedAssetsRuntime::handleSignalStopIfRequested();
+    }
+    EmbeddedAssetsRuntime::clearSignalCleanup();
+
+    // Keep tempdirs alive for the duration of the run (scope).
     (void)tmp;
     return out;
 }

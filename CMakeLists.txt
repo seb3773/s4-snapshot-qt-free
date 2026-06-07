@@ -38,7 +38,7 @@ endif()
 project(s4-snapshot
     VERSION ${PROJECT_VERSION_FROM_CHANGELOG}
     DESCRIPTION "S4 Snapshot - A tool for creating live ISO images from running Debian systems"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 # Set default build type if not specified
@@ -84,6 +84,8 @@ option(QT_FREE_GUARDS "Fail build if qt-free targets include/link Qt" ON)
 
 # Qt-free i18n for backend/tools/CLI
 add_subdirectory(libs/i18n_keyval i18n_keyval_build EXCLUDE_FROM_ALL)
+
+include(${CMAKE_SOURCE_DIR}/cmake/EmbeddedAssets.cmake)
 
 # Qt is optional when building Qt-free targets only.
 set(NEED_QT OFF)
@@ -347,6 +349,7 @@ if(BUILD_TESTS)
     target_link_libraries(unit_tests
         Qt6::Core
         i18n_keyval::i18n_keyval
+        embedded_assets
     )
 
     target_include_directories(unit_tests PRIVATE
@@ -392,6 +395,7 @@ if(BUILD_GUI)
         Qt6::Widgets
         Qt6::Concurrent
         i18n_keyval::i18n_keyval
+        embedded_assets
     )
 
     set_target_properties(s4-snapshot PROPERTIES
@@ -539,6 +543,7 @@ if(BUILD_CLI)
 
     target_link_libraries(iso-snapshot-cli
         i18n_keyval::i18n_keyval
+        embedded_assets
     )
 
     set_target_properties(iso-snapshot-cli PROPERTIES

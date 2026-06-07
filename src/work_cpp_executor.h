@@ -14,6 +14,7 @@ public:
     struct Callbacks {
         std::function<void(const std::string &text)> message;
         std::function<void(BoxType type, const std::string &title, const std::string &text)> messageBox;
+        std::string applicationName;
     };
 
     struct Result {

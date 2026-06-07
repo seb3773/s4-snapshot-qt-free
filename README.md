@@ -198,12 +198,6 @@ sudo iso-snapshot-cli --file my-system.iso --compression zstd
 # Custom kernel
 sudo iso-snapshot-cli --file my-system.iso --kernel 6.1.0-18-amd64
 
-# Use an alternate live-files data directory
-sudo iso-snapshot-cli --file my-system.iso --datafiles-path /path/to/live-files
-
-# Use an alternate ISO templates directory
-sudo iso-snapshot-cli --file my-system.iso --templates-path /path/to/s4-iso-templates
-
 # show help
 iso-snapshot-cli --help
 
@@ -346,27 +340,32 @@ The backend no longer depends on the external `/usr/sbin/installed-to-live` scri
 
 Implemented commands include `start`, `bind=`, `empty=`, `live-files`, `general-files`, `general`, `passwd`, `version-file`, `adjtime`, `grubdefault`, `resumedisable`, `tdmnoautologin`, `sddmnoautologin`, `read-only`, `read-write`, `cleanup`, and `exclude`. This removes the runtime dependency on the script while keeping the existing planner flow and root helper elevation model.
 
-The live file templates are now vendored in `data/live-files/` and can also be overridden with `--datafiles-path <path>`. The expected directory layout is:
+### Embedded runtime assets
+
+Live-files and ISO boot templates are embedded in the CLI and GUI binaries at compile time (~20 MiB LZ4-compressed payload). At runtime the backend:
+
+1. Creates the normal `workDir` under the project temp prefix
+2. Extracts live-files into `workDir/_embedded/live-files/` before `setupEnv`
+3. Extracts ISO templates directly into `workDir/iso-template/` and the initrd workspace during `copyNewIso`
+4. Cleans up `workDir/_embedded/` on exit (including `SIGINT` / `SIGTERM`)
+
+No `data/` tree is installed on target systems by the Debian packages. The `data/` directory in the source tree is only used as **build input** for `scripts/build_embedded_payloads.sh` (invoked automatically by CMake):
 
 ```
-live-files/
-├── files/
-└── general-files/
+data/
+├── live-files/              # files/ + general-files/
+└── iso-templates/
+    ├── iso-template/
+    └── template-initrd/
 ```
 
-The backend resolves live data files in this order: explicit `--datafiles-path`, vendored project data (`data/live-files/`), installed package paths under `/usr/share`, then legacy paths under `/usr/local/share/live-files` and `/usr/share/live-files`. This keeps local testing flexible while preparing for a self-contained package.
+Edit those trees, then rebuild (`./build_cli_qtfree.sh` or `./build_gui.sh`) to refresh the embedded payloads.
 
-The ISO boot templates are now vendored in `data/s4-iso-templates/` and can be overridden with `--templates-path <path>`. The expected directory layout is:
+**Manual payload rebuild** (usually unnecessary):
 
+```bash
+./scripts/build_embedded_payloads.sh
 ```
-s4-iso-templates/
-├── iso-template.tar.gz
-└── template-initrd.gz
-```
-
-If `iso-template-multi.tar.gz` is present in the same directory and both sysvinit and systemd are installed, the backend keeps the legacy behavior and uses it. The required files remain `iso-template.tar.gz` and `template-initrd.gz`.
-
-The backend resolves ISO templates in this order: explicit `--templates-path`, vendored project data (`data/s4-iso-templates/`), installed package paths under `/usr/share`, then the legacy `/usr/lib/iso-template` path.
 
 **validation**:
 - `settings_validation_cpp.cpp` - configuration validation

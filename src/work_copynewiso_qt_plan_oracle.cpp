@@ -79,13 +79,10 @@ WorkCppPlan WorkCopyNewIsoQtPlanOracle::planCopyNewIso(const SettingsFields &set
     plan_message(p, QObject::tr("Copying the new-iso filesystem...").toStdString());
     plan_chdir(p, settings.workDir.toStdString());
 
-    if (env.isoTemplateMultiExists && env.sysvinitInitExists && env.systemdSystemdExists) {
-        plan_run_cmd(p, "tar xf /usr/lib/iso-template/iso-template-multi.tar.gz", false);
-    } else {
-        plan_run_cmd(p, "tar xf /usr/lib/iso-template/iso-template.tar.gz", false);
-    }
-
-    plan_run_cmd(p, "cp /usr/lib/iso-template/template-initrd.gz iso-template/antiX/initrd.gz", false);
+    plan_run_cmd(p,
+                 (QStringLiteral("EMBED_EXTRACT_ISO_TEMPLATE ") + settings.workDir + QStringLiteral("/iso-template"))
+                     .toStdString(),
+                 false);
     plan_run_cmd(p,
                  (QStringLiteral("cp /boot/vmlinuz-") + settings.kernel
                   + QStringLiteral(" iso-template/antiX/vmlinuz"))
@@ -109,11 +106,7 @@ WorkCppPlan WorkCopyNewIsoQtPlanOracle::planCopyNewIso(const SettingsFields &set
     }
 
     const QString path = env.initrdTempDirPath;
-    plan_run_cmd(p,
-                 (QStringLiteral("OPEN_INITRD ") + settings.workDir + QStringLiteral("/iso-template/antiX/initrd.gz ")
-                  + path)
-                     .toStdString(),
-                 false);
+    plan_run_cmd(p, (QStringLiteral("EMBED_POPULATE_INITRD_DIR ") + path).toStdString(), false);
 
     if (path.startsWith(QStringLiteral("/tmp/"))) {
         plan_dir_remove_recursively(p, (path + QStringLiteral("/lib/modules")).toStdString());

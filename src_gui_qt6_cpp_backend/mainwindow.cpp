@@ -27,7 +27,6 @@
 
 #include <QtConcurrent>
 #include <QPointer>
-#include <iostream>
 #include <QCoreApplication>
 #include <QCalendarWidget>
 #include <QDateTime>
@@ -124,38 +123,6 @@ void MainWindow::loadSettings()
                    [](const QString &file) { return file.mid(QStringLiteral("vmlinuz-").length()); });
     ui->comboLiveKernel->addItems(kernelFiles);
     ui->comboLiveKernel->setCurrentText(settings->kernel);
-
-    QString dataFilesPath = settings->dataFilesPathArg;
-    if (dataFilesPath.isEmpty()) {
-        dataFilesPath = qt_settings.value("datafiles_path").toString();
-    }
-    QString templatesPath = settings->templatesPathArg;
-    if (templatesPath.isEmpty()) {
-        templatesPath = qt_settings.value("templates_path").toString();
-    }
-    if (dataFilesPath.isEmpty()) {
-        SettingsArgsCpp args;
-        const SettingsCpp built = SettingsCppBuilder::buildFromArgs(
-            args,
-            true,
-            QCoreApplication::applicationName().toStdString(),
-            QCoreApplication::organizationName().toStdString());
-        dataFilesPath = QString::fromStdString(built.dataFilesPath);
-        if (templatesPath.isEmpty()) {
-            templatesPath = QString::fromStdString(built.templatesPath);
-        }
-    }
-    ui->lineEditDataFilesPath->setText(dataFilesPath);
-    if (templatesPath.isEmpty()) {
-        SettingsArgsCpp args;
-        const SettingsCpp built = SettingsCppBuilder::buildFromArgs(
-            args,
-            true,
-            QCoreApplication::applicationName().toStdString(),
-            QCoreApplication::organizationName().toStdString());
-        templatesPath = QString::fromStdString(built.templatesPath);
-    }
-    ui->lineEditTemplatesPath->setText(templatesPath);
 
     updateCustomExcludesButton();
     watchExcludesFile();
@@ -430,12 +397,6 @@ void MainWindow::setConnections()
     connect(ui->btnHelp, &QPushButton::clicked, this, &MainWindow::btnHelp_clicked);
     connect(ui->btnNext, &QPushButton::clicked, this, &MainWindow::btnNext_clicked);
     connect(ui->btnSelectSnapshot, &QPushButton::clicked, this, &MainWindow::btnSelectSnapshot_clicked);
-    connect(ui->btnSelectDataFiles, &QPushButton::clicked, this, &MainWindow::btnSelectDataFiles_clicked);
-    connect(ui->lineEditDataFilesPath, &QLineEdit::editingFinished, this,
-            &MainWindow::lineEditDataFilesPath_editingFinished);
-    connect(ui->btnSelectTemplates, &QPushButton::clicked, this, &MainWindow::btnSelectTemplates_clicked);
-    connect(ui->lineEditTemplatesPath, &QLineEdit::editingFinished, this,
-            &MainWindow::lineEditTemplatesPath_editingFinished);
     connect(ui->cbCompression, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &MainWindow::cbCompression_currentIndexChanged);
     connect(ui->checkMd5, &QCheckBox::toggled, this, &MainWindow::checkMd5_toggled);
@@ -711,24 +672,11 @@ void MainWindow::showErrorMessageBox(const QString &file_path)
         tr("Output file %1 already exists. Please use another file name, or delete the existent file.").arg(file_path));
 }
 
-bool MainWindow::isTemplatesPathValid(const QString &path) const
-{
-    const QString trimmed = path.trimmed();
-    return QFileInfo::exists(trimmed + "/iso-template.tar.gz")
-        && QFileInfo::exists(trimmed + "/template-initrd.gz");
-}
-
 void MainWindow::handleSelectionPage(const QString &file_name)
 {
     if (!settings->validateSpaceRequirements()) {
         processMsgBox(BoxType::critical, tr("Error"),
                       tr("Insufficient free space. Please select a different snapshot directory or free up space."));
-        return;
-    }
-
-    if (!isTemplatesPathValid(ui->lineEditTemplatesPath->text())) {
-        processMsgBox(BoxType::critical, tr("Error"),
-                      tr("ISO templates directory is invalid. It must contain iso-template.tar.gz and template-initrd.gz."));
         return;
     }
 
@@ -742,9 +690,7 @@ void MainWindow::handleSelectionPage(const QString &file_name)
 
     ui->labelSummary->setText("\n" + tr("- Snapshot directory:") + " " + settings->snapshotDir + "\n" + "- "
                               + tr("Snapshot name:") + " " + file_name + "\n" + tr("- Kernel to be used:") + " "
-                              + settings->kernel + "\n" + tr("- Live files data:") + " "
-                              + ui->lineEditDataFilesPath->text().trimmed() + "\n" + tr("- ISO templates:") + " "
-                              + ui->lineEditTemplatesPath->text().trimmed() + "\n");
+                              + settings->kernel + "\n");
     settings->codename = ui->textCodename->text();
     settings->distroVersion = ui->textDistroVersion->text();
     settings->projectName = ui->textProjectName->text();
@@ -882,10 +828,6 @@ bool MainWindow::confirmStart()
 
 void MainWindow::applyExclusions()
 {
-    qDebug() << "=== DEBUG SESSION EXCLUDES - applyExclusions() START ===";
-    qDebug() << "BEFORE applyExclusions - sessionExcludes:" << settings->sessionExcludes;
-    qDebug() << "BEFORE applyExclusions - length:" << settings->sessionExcludes.length();
-    
     settings->excludeDesktop(ui->excludeDesktop->isChecked());
     settings->excludeDocuments(ui->excludeDocuments->isChecked());
     settings->excludeDownloads(ui->excludeDownloads->isChecked());
@@ -897,10 +839,6 @@ void MainWindow::applyExclusions()
     settings->excludeVideos(ui->excludeVideos->isChecked());
     settings->excludeVirtualBox(ui->excludeVirtualBox->isChecked());
     settings->otherExclusions();
-    
-    qDebug() << "AFTER applyExclusions - sessionExcludes:" << settings->sessionExcludes;
-    qDebug() << "AFTER applyExclusions - length:" << settings->sessionExcludes.length();
-    qDebug() << "=== DEBUG SESSION EXCLUDES - applyExclusions() END ===";
 }
 
 void MainWindow::prepareForOutput(const QString &/*file_name*/)
@@ -916,8 +854,6 @@ void MainWindow::prepareForOutput(const QString &/*file_name*/)
     // Set operation in progress
     m_operationInProgress.store(true);
     m_abortRequested.store(false);
-    
-    std::cerr << "=== prepareForOutput() - Starting ASYNC backend execution ===" << std::endl;
     
     // DISABLE all controls except Cancel button (execution starting)
     enableControls(false);
@@ -959,51 +895,25 @@ void MainWindow::prepareForOutput(const QString &/*file_name*/)
     args.preempt = settings->preempt;
     args.fileArg = settings->snapshotName.toStdString();
     args.maxCoresOverride = static_cast<std::uint32_t>(settings->cores);
-    const QString dataFilesPath = ui->lineEditDataFilesPath->text().trimmed();
-    if (!dataFilesPath.isEmpty()) {
-        args.dataFilesPathArg = dataFilesPath.toStdString();
-    }
-    const QString templatesPath = ui->lineEditTemplatesPath->text().trimmed();
-    if (!templatesPath.isEmpty()) {
-        args.templatesPathArg = templatesPath.toStdString();
-    }
-
     // CRITICAL: Save sessionExcludes BEFORE buildFromArgs (which clears it)
     // applyExclusions() on line 776 built settings->sessionExcludes from checkboxes
     // buildFromArgs() clears sessionExcludes on line 198 of settings_cpp_builder.cpp
     // So we must save it first and restore it after
-    
-    qDebug() << "=== DEBUG SESSION EXCLUDES - SAVE/RESTORE START ===";
-    qDebug() << "BEFORE save - settings->sessionExcludes:" << settings->sessionExcludes;
-    qDebug() << "BEFORE save - length:" << settings->sessionExcludes.length();
-    
     const std::string savedSessionExcludes = settings->sessionExcludes.toStdString();
-    
-    qDebug() << "SAVED sessionExcludes - length:" << savedSessionExcludes.length();
-    qDebug() << "SAVED sessionExcludes - content:" << QString::fromStdString(savedSessionExcludes);
-    qDebug() << "DEBUG: sessionExcludes BEFORE buildFromArgs:" << settings->sessionExcludes;
-    qDebug() << "DEBUG: sessionExcludes length:" << settings->sessionExcludes.length();
-    
+
     SettingsCpp cppSettings = SettingsCppBuilder::buildFromArgs(
         args,
         true, // isGuiApp
         QCoreApplication::applicationName().toStdString(),
         QCoreApplication::organizationName().toStdString()
     );
-    
-    qDebug() << "BEFORE restore - cppSettings.sessionExcludes:" << QString::fromStdString(cppSettings.sessionExcludes);
-    qDebug() << "BEFORE restore - length:" << cppSettings.sessionExcludes.length();
-    
+
     // CRITICAL FIX: Restore sessionExcludes from GUI to backend
     // The GUI allows users to add/remove exclusions at runtime via checkboxes
     // These are stored in settings->sessionExcludes and MUST be passed to the backend
     // Otherwise, the space calculation will ignore user-selected exclusions
     cppSettings.sessionExcludes = savedSessionExcludes;
-    
-    qDebug() << "AFTER restore - cppSettings.sessionExcludes:" << QString::fromStdString(cppSettings.sessionExcludes);
-    qDebug() << "AFTER restore - length:" << cppSettings.sessionExcludes.length();
-    qDebug() << "=== DEBUG SESSION EXCLUDES - SAVE/RESTORE END ===";
-    
+
     // Setup BatchprocessingCppRunner callbacks
     BatchprocessingCppRunner::Callbacks cb;
     cb.debug = messageCallback;
@@ -1013,17 +923,19 @@ void MainWindow::prepareForOutput(const QString &/*file_name*/)
     // CRITICAL FIX: Capture cb by VALUE, not by reference (&cb)
     // The local variable cb goes out of scope, causing segfault
     BatchprocessingCppRunner::Dependencies deps;
-    deps.runWork = [cb](const WorkCppPlan &plan, const WorkCppExecutor::Callbacks &/*wcb*/) -> WorkCppExecutor::Result {
+    deps.applicationName = QCoreApplication::applicationName().toStdString();
+    deps.runWork = [cb, appName = deps.applicationName](const WorkCppPlan &plan,
+                                                        const WorkCppExecutor::Callbacks &/*wcb*/)
+        -> WorkCppExecutor::Result {
         WorkCppExecutor::Callbacks executorCb;
         executorCb.message = cb.debug;
         executorCb.messageBox = [cb](BoxType /*type*/, const std::string &title, const std::string &text) {
             cb.debug(title + " " + text);
         };
+        executorCb.applicationName = appName;
         return WorkCppExecutor::run(plan, executorCb);
     };
-    
-    std::cerr << "DEBUG: Launching backend in background thread via QtConcurrent" << std::endl;
-    
+
     // Launch backend execution asynchronously
     startBackgroundProcessing(cppSettings, QCoreApplication::applicationName().toStdString(), cb, deps);
     
@@ -1211,53 +1123,6 @@ void MainWindow::btnSelectSnapshot_clicked()
     }
 }
 
-void MainWindow::btnSelectDataFiles_clicked()
-{
-    const QString current = ui->lineEditDataFilesPath->text().trimmed();
-    const QString selected = QFileDialog::getExistingDirectory(
-        this, tr("Select live-files data directory"), current, QFileDialog::ShowDirsOnly);
-    if (!selected.isEmpty()) {
-        ui->lineEditDataFilesPath->setText(selected);
-        qt_settings.setValue("datafiles_path", selected);
-    }
-}
-
-void MainWindow::lineEditDataFilesPath_editingFinished()
-{
-    qt_settings.setValue("datafiles_path", ui->lineEditDataFilesPath->text().trimmed());
-}
-
-void MainWindow::btnSelectTemplates_clicked()
-{
-    const QString current = ui->lineEditTemplatesPath->text().trimmed();
-    const QString selected = QFileDialog::getExistingDirectory(
-        this, tr("Select ISO templates directory"), current, QFileDialog::ShowDirsOnly);
-    if (selected.isEmpty()) {
-        return;
-    }
-    if (!isTemplatesPathValid(selected)) {
-        QMessageBox::critical(this,
-                              tr("Error"),
-                              tr("ISO templates directory is invalid. It must contain iso-template.tar.gz and template-initrd.gz."));
-        return;
-    }
-    ui->lineEditTemplatesPath->setText(selected);
-    qt_settings.setValue("templates_path", selected);
-}
-
-void MainWindow::lineEditTemplatesPath_editingFinished()
-{
-    const QString path = ui->lineEditTemplatesPath->text().trimmed();
-    if (!isTemplatesPathValid(path)) {
-        QMessageBox::critical(this,
-                              tr("Error"),
-                              tr("ISO templates directory is invalid. It must contain iso-template.tar.gz and template-initrd.gz."));
-        ui->lineEditTemplatesPath->setText(qt_settings.value("templates_path").toString());
-        return;
-    }
-    qt_settings.setValue("templates_path", path);
-}
-
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
@@ -1391,33 +1256,16 @@ void MainWindow::spinThrottle_valueChanged(int arg1)
 
 void MainWindow::handleBackendMessage(const std::string& msg)
 {
-    std::cerr << "DEBUG: handleBackendMessage() called with: " << msg << std::endl;
-    
-    // Thread-safe conversion and routing to existing processMsg()
-    QString qmsg = QString::fromStdString(msg);
-    
-    std::cerr << "DEBUG: About to invoke processMsg() via QMetaObject" << std::endl;
-    
-    // Use Qt's thread-safe mechanism to update GUI
+    const QString qmsg = QString::fromStdString(msg);
     QMetaObject::invokeMethod(this, [this, qmsg]() {
-        std::cerr << "DEBUG: processMsg() lambda executing in GUI thread" << std::endl;
         processMsg(qmsg);
     }, Qt::QueuedConnection);
-    
-    std::cerr << "DEBUG: QMetaObject::invokeMethod() returned" << std::endl;
 }
 
 void MainWindow::handleBackendLog(const std::string& log)
 {
-    std::cerr << "DEBUG: handleBackendLog() called with: " << log << std::endl;
-    
-    // Thread-safe log handling
-    QString qlog = QString::fromStdString(log);
-    
+    const QString qlog = QString::fromStdString(log);
     QMetaObject::invokeMethod(this, [this, qlog]() {
-        std::cerr << "DEBUG: processMsg() lambda (from log) executing in GUI thread" << std::endl;
-        // Route to existing log display mechanism
-        // Logs are displayed through processMsg in the original implementation
         processMsg(qlog);
     }, Qt::QueuedConnection);
 }
@@ -1440,19 +1288,7 @@ void MainWindow::startBackgroundProcessing(const SettingsCpp &cppSettings,
 {
     // Launch backend execution in a separate thread using QtConcurrent
     QFuture<BatchprocessingCppRunner::Result> future = QtConcurrent::run([=]() {
-        std::cerr << "DEBUG: Backend thread started" << std::endl;
-        
-        // Run the complete ISO creation workflow
-        // This replaces: setupEnv(), checkEnoughSpace(), copyNewIso(), savePackageList(), createIso()
-        BatchprocessingCppRunner::Result result = BatchprocessingCppRunner::runFromSettings(
-            cppSettings,
-            appName,
-            cb,
-            deps
-        );
-        
-        std::cerr << "DEBUG: Backend thread completed - aborted: " << result.aborted << std::endl;
-        return result;
+        return BatchprocessingCppRunner::runFromSettings(cppSettings, appName, cb, deps);
     });
     
     // Monitor the future for completion
@@ -1461,16 +1297,9 @@ void MainWindow::startBackgroundProcessing(const SettingsCpp &cppSettings,
 
 void MainWindow::onBackgroundProcessingFinished()
 {
-    std::cerr << "=== onBackgroundProcessingFinished() called ===" << std::endl;
-    
-    // Stop the progress timer
     timer.stop();
-    
-    // Get the result from the background thread
-    BatchprocessingCppRunner::Result result = m_futureWatcher->result();
-    
-    std::cerr << "DEBUG: Result - aborted: " << result.aborted << std::endl;
-    
+    const BatchprocessingCppRunner::Result result = m_futureWatcher->result();
+
     // Handle result
     if (result.aborted) {
         processMsg(tr("Error: %1").arg(QString::fromStdString(result.abortReason)));
@@ -1496,8 +1325,6 @@ void MainWindow::onBackgroundProcessingFinished()
     // Update button state
     ui->btnCancel->setText(tr("Close"));
     ui->btnCancel->setEnabled(true);
-    
-    std::cerr << "=== Background processing finished ===" << std::endl;
 }
 
 // ============================================================================
@@ -1511,8 +1338,6 @@ void MainWindow::enableControls(bool enable)
     ui->btnAbout->setEnabled(enable);
     ui->btnHelp->setEnabled(enable);
     ui->btnSelectSnapshot->setEnabled(enable);
-    ui->btnSelectDataFiles->setEnabled(enable);
-    ui->btnSelectTemplates->setEnabled(enable);
     ui->btnEditExclude->setEnabled(enable);
     ui->btnRemoveCustomExclude->setEnabled(enable);
     
@@ -1524,8 +1349,6 @@ void MainWindow::enableControls(bool enable)
     ui->comboLiveKernel->setEnabled(enable);
     ui->pushReleaseDate->setEnabled(enable);
     ui->lineEditName->setEnabled(enable);
-    ui->lineEditDataFilesPath->setEnabled(enable);
-    ui->lineEditTemplatesPath->setEnabled(enable);
 
     // Settings page - Exclusion checkboxes
     ui->excludeAll->setEnabled(enable);

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <iomanip>
-#include <iostream>
 #include <locale>
 #include <sstream>
 
@@ -240,27 +239,20 @@ static std::uint64_t device_id_u64(const std::string &path)
 static std::vector<std::string> split_session_excludes_like_qt(const std::string &sessionExcludes)
 {
     // Qt: QStringList excludeList = sessionExcludes.split("\" \""); then remove quotes.
-    std::cerr << "=== DEBUG split_session_excludes_like_qt START ===" << std::endl;
-    std::cerr << "Input sessionExcludes length: " << sessionExcludes.length() << std::endl;
-    std::cerr << "Input sessionExcludes: " << sessionExcludes << std::endl;
     
     if (sessionExcludes.empty()) {
-        std::cerr << "sessionExcludes is EMPTY, returning empty vector" << std::endl;
-        std::cerr << "=== DEBUG split_session_excludes_like_qt END ===" << std::endl;
         return {};
     }
 
     std::vector<std::string> out;
     std::size_t start = 0;
     const std::string sep = "\" \"";
-    int partIndex = 0;
     
     while (true) {
         const std::size_t pos = sessionExcludes.find(sep, start);
         std::string part = (pos == std::string::npos) ? sessionExcludes.substr(start)
                                                       : sessionExcludes.substr(start, pos - start);
 
-        std::cerr << "Part " << partIndex << " BEFORE cleanup: [" << part << "]" << std::endl;
         
         part.erase(std::remove(part.begin(), part.end(), '"'), part.end());
         // trimmed
@@ -271,24 +263,17 @@ static std::vector<std::string> split_session_excludes_like_qt(const std::string
             part.pop_back();
         }
 
-        std::cerr << "Part " << partIndex << " AFTER cleanup: [" << part << "]" << std::endl;
         
         if (!part.empty()) {
             out.push_back(part);
-            std::cerr << "Part " << partIndex << " ADDED to output" << std::endl;
-        } else {
-            std::cerr << "Part " << partIndex << " SKIPPED (empty)" << std::endl;
         }
 
         if (pos == std::string::npos) {
             break;
         }
         start = pos + sep.size();
-        partIndex++;
     }
 
-    std::cerr << "Total parts extracted: " << out.size() << std::endl;
-    std::cerr << "=== DEBUG split_session_excludes_like_qt END ===" << std::endl;
     return out;
 }
 
@@ -325,9 +310,6 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
                                                    const std::string &applicationName,
                                                    const Callbacks &cb)
 {
-    std::cerr << "=== DEBUG getRequiredSpaceLikeQt START ===" << std::endl;
-    std::cerr << "settings.sessionExcludes length: " << settings.sessionExcludes.length() << std::endl;
-    std::cerr << "settings.sessionExcludes: " << settings.sessionExcludes << std::endl;
     
     std::vector<std::string> excludes;
 
@@ -364,16 +346,13 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
         }
     }
 
-    std::cerr << "Excludes from file: " << excludes.size() << std::endl;
 
     // Add session excludes
     if (!settings.sessionExcludes.empty()) {
         const std::vector<std::string> xs = split_session_excludes_like_qt(settings.sessionExcludes);
-        std::cerr << "Session excludes parsed: " << xs.size() << std::endl;
         excludes.insert(excludes.end(), xs.begin(), xs.end());
     }
     
-    std::cerr << "Total excludes BEFORE expansion: " << excludes.size() << std::endl;
 
     std::string sizeRoot = "/.bind-root";
     const std::string overlayLower = std::string("/run/") + applicationName + "/bind-root-overlay/lower";
@@ -583,46 +562,36 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
     std::vector<std::string> expandedExcludes;
     expandedExcludes.reserve(excludes.size());
 
-    std::cerr << "=== EXPANDING EXCLUDES ===" << std::endl;
     for (const std::string &rawValue : excludes) {
-        std::cerr << "Processing exclude: [" << rawValue << "]" << std::endl;
         std::string cleaned = rawValue;
         const std::size_t bangIndex = cleaned.find('!');
         if (bangIndex != std::string::npos) {
             cleaned.resize(bangIndex);
-            std::cerr << "  After removing !: [" << cleaned << "]" << std::endl;
         }
         if (cleaned.empty()) {
-            std::cerr << "  SKIPPED (empty after cleanup)" << std::endl;
             continue;
         }
 
         const std::vector<std::string> matches = expand_exclude_pattern(cleaned);
-        std::cerr << "  Expanded to " << matches.size() << " matches" << std::endl;
         for (const std::string &match : matches) {
             if (!is_allowed_device(match)) {
-                std::cerr << "    SKIPPED (not allowed device): " << match << std::endl;
                 continue;
             }
             const std::string normalized = normalize_exclude(match);
             if (!normalized.empty()) {
                 expandedExcludes.push_back(normalized);
-                std::cerr << "    ADDED: " << normalized << std::endl;
             } else {
-                std::cerr << "    SKIPPED (empty after normalize): " << match << std::endl;
             }
         }
     }
 
     excludes = expandedExcludes;
-    std::cerr << "Total excludes AFTER expansion: " << excludes.size() << std::endl;
 
     // Filter out nested paths to avoid double-counting in size calculation
     std::sort(excludes.begin(), excludes.end(), [](const std::string &a, const std::string &b) {
         return a.size() < b.size();
     });
 
-    std::cerr << "=== FILTERING NESTED PATHS ===" << std::endl;
     std::vector<std::string> filteredExcludes;
     for (const std::string &path : excludes) {
         bool isNested = false;
@@ -633,18 +602,15 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
             }
             if (path == accepted || starts_with(path, accepted + "/")) {
                 isNested = true;
-                std::cerr << "  NESTED: [" << path << "] is nested under [" << accepted << "]" << std::endl;
                 break;
             }
         }
         if (!isNested) {
             filteredExcludes.push_back(path);
-            std::cerr << "  KEPT: [" << path << "]" << std::endl;
         }
     }
 
     excludes = filteredExcludes;
-    std::cerr << "Total excludes AFTER filtering: " << excludes.size() << std::endl;
 
     cb_message(cb, "Calculating total size of excluded files...");
 
@@ -739,23 +705,12 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
     }
 
     if (excl_size > root_size) {
-        std::cerr << "WARNING: Excluded size exceeds root size; clamping excluded size for estimate." << std::endl;
-        std::cerr << "Root: " << root_size << " KB, Excluded: " << excl_size << " KB" << std::endl;
         excl_size = root_size;
     }
 
-    constexpr double kibToMib = 1024.0;
-    std::cerr << "=== SIZE CALCULATION SUMMARY ===" << std::endl;
-    std::cerr << "SIZE         " << format_double_fixed_2(root_size / kibToMib) << " MiB" << std::endl;
-    std::cerr << "SIZE EXCLUDES" << format_double_fixed_2(excl_size / kibToMib) << " MiB" << std::endl;
-    
     const std::uint8_t c_factor = compression_factor_value_like_settings_qt(settings.compression);
-    std::cerr << "COMPRESSION  " << static_cast<int>(c_factor) << "%" << std::endl;
     
     const std::uint64_t result = (root_size - excl_size) * static_cast<std::uint64_t>(c_factor) / 100ULL;
-    std::cerr << "SIZE NEEDED  " << format_double_fixed_2(result / kibToMib) << " MiB" << std::endl;
-    std::cerr << "SIZE FREE    " << format_double_fixed_2(settings.freeSpace / kibToMib) << " MiB" << std::endl;
-    std::cerr << "=== END SIZE CALCULATION ===" << std::endl;
     
     return result;
 }
@@ -783,11 +738,6 @@ WorkSpaceCpp::CheckEnoughSpaceResult WorkSpaceCpp::checkEnoughSpaceLikeQt(const 
     };
 
     // Check foremost if enough space for ISO on snapshot_dir
-    std::cerr << "=== CHECK ENOUGH SPACE ===" << std::endl;
-    std::cerr << "required_space: " << required_space << " KiB (" << format_double_fixed_2(required_space / 1024.0 / 1024.0) << " GiB)" << std::endl;
-    std::cerr << "settings.freeSpace: " << settings.freeSpace << " KiB (" << format_double_fixed_2(settings.freeSpace / 1024.0 / 1024.0) << " GiB)" << std::endl;
-    std::cerr << "settings.snapshotDir: " << settings.snapshotDir << std::endl;
-    std::cerr << "settings.workDir: " << settings.workDir << std::endl;
     
     check_no_space(required_space, settings.freeSpace, settings.snapshotDir);
     if (!out.ok) {
@@ -796,14 +746,9 @@ WorkSpaceCpp::CheckEnoughSpaceResult WorkSpaceCpp::checkEnoughSpaceLikeQt(const 
 
     const std::uint64_t workDirDevice = device_id_u64(settings.workDir + "/");
     const std::uint64_t snapshotDirDevice = device_id_u64(settings.snapshotDir + "/");
-    std::cerr << "workDir device ID: " << workDirDevice << std::endl;
-    std::cerr << "snapshotDir device ID: " << snapshotDirDevice << std::endl;
     
     if (workDirDevice == snapshotDirDevice) {
-        std::cerr << "workDir and snapshotDir are on the SAME device" << std::endl;
         if (settings.freeSpace < required_space * 2) {
-            std::cerr << "Free space (" << settings.freeSpace << ") < 2x required (" << (required_space * 2) << ")" << std::endl;
-            std::cerr << "Trying to move workDir to /tmp or /home..." << std::endl;
             auto check_and_move = [&](const std::string &dir, std::uint64_t req_size) -> bool {
                 if (device_id_u64(dir + "/") != device_id_u64(settings.snapshotDir + "/")
                     && FileSystemUtilsCpp::getFreeSpaceKiB(dir) > req_size) {

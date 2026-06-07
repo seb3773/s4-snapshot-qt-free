@@ -1829,26 +1829,6 @@ void Settings::processArgs(
     }
 
 #ifdef CLI_BUILD
-    if (!valueQ("datafiles-path").isEmpty()) {
-        dataFilesPathArg = valueQ("datafiles-path");
-    }
-#else
-    if (!argParser.value("datafiles-path").isEmpty()) {
-        dataFilesPathArg = argParser.value("datafiles-path");
-    }
-#endif
-
-#ifdef CLI_BUILD
-    if (!valueQ("templates-path").isEmpty()) {
-        templatesPathArg = valueQ("templates-path");
-    }
-#else
-    if (!argParser.value("templates-path").isEmpty()) {
-        templatesPathArg = argParser.value("templates-path");
-    }
-#endif
-
-#ifdef CLI_BUILD
     if (!valueQ("file").isEmpty()) {
         const auto fileArg = valueQ("file");
 #else

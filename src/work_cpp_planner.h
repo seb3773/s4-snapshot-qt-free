@@ -24,10 +24,6 @@ public:
                                                   const CreateIsoEnv &env);
 
     struct CopyNewIsoEnv {
-        bool isoTemplateMultiExists = false;
-        bool sysvinitInitExists = false;
-        bool systemdSystemdExists = false;
-
         bool initrdReleaseExists = false;
         bool initrdReleaseIsFile = false;
         bool initrdReleaseDestExists = false;

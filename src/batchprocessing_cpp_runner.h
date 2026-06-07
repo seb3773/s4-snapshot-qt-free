@@ -17,6 +17,7 @@ public:
 
     struct Dependencies {
         std::function<WorkCppExecutor::Result(const WorkCppPlan &plan, const WorkCppExecutor::Callbacks &cb)> runWork;
+        std::string applicationName;
     };
 
     struct Result {
