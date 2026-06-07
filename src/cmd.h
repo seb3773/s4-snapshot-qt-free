@@ -29,8 +29,7 @@ public:
     enum class QuietMode { No, Yes };
     enum class Elevation { No, Yes };
 
-    // Returns the elevation tool path appropriate for current mode (CLI/GUI),
-    // preferring sudo in CLI, pkexec in GUI. Empty if none found.
+    // Returns the first supported elevation tool path. Empty if none found.
     static QString elevationTool();
     static bool isCliMode();
     static QString loggedInUserName();

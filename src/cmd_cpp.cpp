@@ -158,9 +158,9 @@ bool CmdCpp::helperProc(const std::vector<std::string> &helperArgs, std::string 
     if (getuid() != 0 && elevationToolPath.empty()) {
         // Matches Cmd (CLI_BUILD): warn and return false; no message box and no exit.
         // The Qt version logs:
-        //   qWarning().noquote() << tr("No elevation tool found (pkexec/gksu/sudo).")
+        //   qWarning().noquote() << tr("No elevation tool found (sudo/doas/gksu).")
         // We keep the same human text.
-        LoggerCpp::log(LoggerCpp::Level::Warning, std::string("No elevation tool found (pkexec/gksu/sudo)."));
+        LoggerCpp::log(LoggerCpp::Level::Warning, std::string("No elevation tool found (sudo/doas/gksu)."));
         return false;
     }
 

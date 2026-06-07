@@ -124,17 +124,18 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
                             // This matches the Qt behavior of calling cleanUp() when installed-to-live fails
                             
                             const std::string appName = application_name_for_cleanup(cb);
-                            const std::string snapshotLib = "/usr/lib/" + appName + "/snapshot-lib";
-                            const std::string elevateTool = CommandRunner::elevationTool();
 
-                            (void)CommandRunner::run(elevateTool + " " + snapshotLib + " chown_conf",
-                                                     CommandRunner::QuietMode::Yes);
+                            (void)CommandRunner::procAsRoot("chown_conf",
+                                                            {},
+                                                            std::string(),
+                                                            CommandRunner::QuietMode::Yes);
 #ifdef UNIT_TESTS
                             (void)TempDir::removeRecursivelyForTests("<tempdir>");
 #endif
-                            const std::string elevateTool2 = CommandRunner::elevationTool();
-                            (void)CommandRunner::run(elevateTool2 + " " + snapshotLib + " cleanup_overlay " + appName,
-                                                     CommandRunner::QuietMode::Yes);
+                            (void)CommandRunner::procAsRoot("cleanup_overlay",
+                                                            {appName},
+                                                            std::string(),
+                                                            CommandRunner::QuietMode::Yes);
                             
                             r.aborted = true;
                             r.abortReason = "installed-to-live command failed - cleanUp called";

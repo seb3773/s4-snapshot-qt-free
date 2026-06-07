@@ -4749,7 +4749,7 @@ static void test_settings_getFilename_qt_vs_settingsfilenamecpp_oracle_numeric_i
 static void test_settings_getEditor_qt_vs_settingseditorcpp_oracle_guiEditor_override_cli_editor()
 {
     CommandRunner::Hooks cmdHooks;
-    cmdHooks.elevationTool = []() { return std::string("/usr/bin/pkexec"); };
+    cmdHooks.elevationTool = []() { return std::string("/usr/bin/sudo"); };
     CommandRunner::setHooksForTests(&cmdHooks);
 
     WorkCppUtils::Hooks utilsHooks;
@@ -4826,7 +4826,7 @@ static void test_settings_getEditor_qt_vs_settingseditorcpp_oracle_xdg_mime_desk
         r.mergedText = r.stderrText;
         return r;
     };
-    cmdHooks.elevationTool = []() { return std::string("/usr/bin/pkexec"); };
+    cmdHooks.elevationTool = []() { return std::string("/usr/bin/sudo"); };
     CommandRunner::setHooksForTests(&cmdHooks);
 
     WorkCppUtils::Hooks utilsHooks;
@@ -5582,7 +5582,7 @@ static void test_batchprocessing_cpp_runner_runFromSettings_checkEnoughSpace_run
         r.mergedText = "unexpected command\n";
         return r;
     };
-    hooks.elevationTool = []() { return std::string("/usr/bin/pkexec"); };
+    hooks.elevationTool = []() { return std::string("/usr/bin/sudo"); };
     hooks.loggedInUserName = []() { return std::string("alice"); };
 
     CommandRunner::setHooksForTests(&hooks);
@@ -6074,11 +6074,11 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_bind_mount_fail_abort_cl
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
                 if (elevationToolCount == 0 && script.find("<elevate_tool>") != std::string::npos
-                    && script.find("snapshot-lib datetime_log") != std::string::npos) {
+                    && script.find("datetime_log") != std::string::npos) {
                     tr.add("CommandRunner::elevationTool");
                     ++elevationToolCount;
                 } else if (elevationToolCount == 1 && script.find("<elevate_tool>") != std::string::npos
-                           && script.find("snapshot-lib chown_conf") != std::string::npos) {
+                           && script.find("chown_conf") != std::string::npos) {
                     tr.add("CommandRunner::elevationTool");
                     ++elevationToolCount;
                 }
@@ -6125,7 +6125,7 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_bind_mount_fail_abort_cl
 
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
-                if (script.find("snapshot-lib datetime_log") != std::string::npos) {
+                if (script.find("datetime_log") != std::string::npos) {
                     if (!didProbeMxVersion) {
                         (void)FileCpp::exists("/usr/local/share/live-files/files/etc/mx-version");
                         didProbeMxVersion = true;
@@ -6618,7 +6618,7 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_success_overlay_ok_insta
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
                 if (elevationToolCount == 0 && script.find("<elevate_tool>") != std::string::npos
-                    && script.find("snapshot-lib datetime_log") != std::string::npos) {
+                    && script.find("datetime_log") != std::string::npos) {
                     tr.add("CommandRunner::elevationTool");
                     ++elevationToolCount;
                 }
@@ -6666,7 +6666,7 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_success_overlay_ok_insta
 
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
-                if (script.find("snapshot-lib datetime_log") != std::string::npos) {
+                if (script.find("datetime_log") != std::string::npos) {
                     if (!didProbeMxVersion) {
                         (void)FileCpp::exists("/usr/local/share/live-files/files/etc/mx-version");
                         didProbeMxVersion = true;
@@ -7164,7 +7164,7 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_installed_to_live_failur
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
                 if (elevationToolCount == 0 && script.find("<elevate_tool>") != std::string::npos
-                    && script.find("snapshot-lib datetime_log") != std::string::npos) {
+                    && script.find("datetime_log") != std::string::npos) {
                     tr.add("CommandRunner::elevationTool");
                     ++elevationToolCount;
                 }
@@ -7212,7 +7212,7 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_installed_to_live_failur
 
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
-                if (script.find("snapshot-lib datetime_log") != std::string::npos) {
+                if (script.find("datetime_log") != std::string::npos) {
                     if (!didProbeMxVersion) {
                         (void)FileCpp::exists("/usr/local/share/live-files/files/etc/mx-version");
                         didProbeMxVersion = true;
@@ -9599,7 +9599,7 @@ static void test_tr_qobject_qm_qt_oracle_vs_cpp_qm_loader_fr()
     const std::vector<Case> cases {
         {"QObject", "Tool used for creating a live-CD from the running system", ""},
         {"QObject", "Use CLI only", ""},
-        {"QObject", "You must run this program with sudo or pkexec.", ""},
+        {"QObject", "No supported elevation tool found (sudo/doas/gksu).", ""},
         {"QObject", "Error", ""},
         {"QObject", "Current kernel doesn't support Squashfs, cannot continue.", ""},
         {"QObject", "Could not find a usable kernel", ""},
@@ -14714,11 +14714,11 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_overlay_fail_abort_clean
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
                 if (elevationToolCount == 0 && script.find("<elevate_tool>") != std::string::npos
-                    && script.find("snapshot-lib datetime_log") != std::string::npos) {
+                    && script.find("datetime_log") != std::string::npos) {
                     tr.add("CommandRunner::elevationTool");
                     ++elevationToolCount;
                 } else if (elevationToolCount == 1 && script.find("<elevate_tool>") != std::string::npos
-                           && script.find("snapshot-lib chown_conf") != std::string::npos) {
+                           && script.find("chown_conf") != std::string::npos) {
                     tr.add("CommandRunner::elevationTool");
                     ++elevationToolCount;
                 }
@@ -14757,7 +14757,7 @@ static void test_work_setupenv_runtime_qt_vs_cpp_oracle_overlay_fail_abort_clean
 
             if (cmd == "/bin/bash" && args.size() >= 2) {
                 const std::string &script = args[1];
-                if (script.find("snapshot-lib datetime_log") != std::string::npos) {
+                if (script.find("datetime_log") != std::string::npos) {
                     if (!didProbeMxVersion) {
                         (void)FileCpp::exists("/usr/local/share/live-files/files/etc/mx-version");
                         didProbeMxVersion = true;
@@ -15007,11 +15007,11 @@ static void test_work_createiso_appname_qt_vs_cpp_exact()
           "QCoreApplication::applicationName() must match C++ basename extraction");
     
     // Test in path construction context (line 661 in work.cpp)
-    const QString qtSnapshotLib = "/usr/lib/" + qtAppName + "/snapshot-lib";
-    const std::string cppSnapshotLib = "/usr/lib/" + cppAppName + "/snapshot-lib";
+    const QString qtHelperPath = "/usr/lib/" + qtAppName + "/helper";
+    const std::string cppHelperPath = "/usr/lib/" + cppAppName + "/helper";
     
-    check(qtSnapshotLib.toStdString() == cppSnapshotLib,
-          "snapshot-lib path construction must match between Qt and C++");
+    check(qtHelperPath.toStdString() == cppHelperPath,
+          "helper path construction must match between Qt and C++");
     
     // Test in error message context (line 651 in work.cpp)
     const QString qtErrorMsg = QString("Could not create linuxfs file, please check /var/log/%1.log").arg(qtAppName);

@@ -407,16 +407,18 @@ Settings::Settings(
         const QString overlayBase = "/run/" + appName + "/bind-root-overlay";
         bool cleanupRan = false;
         bool cleanupOk = true;
-        const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
         if (FileCpp::exists(std::string("/tmp/installed-to-live/cleanup.conf")) || FileCpp::exists(overlayBase.toStdString())) {
             cleanupRan = true;
-            cleanupOk = CommandRunner::run((elevateTool + " /usr/lib/" + appName + "/snapshot-lib cleanup").toStdString());
+            const CommandRunner::Result cleanupResult = CommandRunner::procAsRoot(
+                "cleanup", {}, std::string(), CommandRunner::QuietMode::Yes);
+            cleanupOk = cleanupResult.started && cleanupResult.normalExit && cleanupResult.exitCode == 0;
         }
         const QString overlayRoot = "/run/" + appName + "/bind-root-overlay/root";
         const bool bindRootMounted = CommandRunner::run("mountpoint -q /.bind-root", CommandRunner::QuietMode::Yes)
             || CommandRunner::run(("mountpoint -q \"" + overlayRoot + "\"").toStdString(), CommandRunner::QuietMode::Yes);
         if (!cleanupRan || cleanupOk || !bindRootMounted) {
-            (void)CommandRunner::run((elevateTool + " /usr/lib/" + appName + "/snapshot-lib cleanup_overlay " + appName).toStdString());
+            (void)CommandRunner::procAsRoot(
+                "cleanup_overlay", {appName.toStdString()}, std::string(), CommandRunner::QuietMode::Yes);
         }
 
         loadConfig(); // Load settings from .conf file

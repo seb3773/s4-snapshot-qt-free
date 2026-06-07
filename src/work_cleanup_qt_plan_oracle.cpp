@@ -28,6 +28,16 @@ static void plan_run_cmd(WorkCppPlan &p, const std::string &cmd, bool quietYes)
     p.steps.push_back(std::move(st));
 }
 
+static void plan_proc_root(WorkCppPlan &p,
+                           const std::string &program,
+                           const std::vector<std::string> &args,
+                           bool quietYes)
+{
+    WorkCppPlanStep st;
+    st.payload = WorkCppPlanStep::ProcAsRoot{program, args, quietYes};
+    p.steps.push_back(std::move(st));
+}
+
 static void plan_process_execute(WorkCppPlan &p, const std::string &program, const std::vector<std::string> &args, int timeoutMs)
 {
     WorkCppPlanStep st;
@@ -69,20 +79,14 @@ WorkCppPlan WorkCleanupQtPlanOracle::planCleanup(const SettingsFields &settings,
 {
     WorkCppPlan p;
 
-    // This replicates the Qt Work::cleanUp() method exactly
-    const QString snapshotLib = "/usr/lib/" + env.applicationName + "/snapshot-lib";
-    const QString elevateTool = env.elevateTool;
-
     // Step 1: chown_conf
-    plan_run_cmd(p, (elevateTool + " " + snapshotLib + " chown_conf").toStdString(), true);
+    plan_proc_root(p, "chown_conf", {}, true);
 
     // Step 2: Handle early exit if not started
     if (!env.started) {
         plan_temp_dir_remove(p, "initrd_dir");
         if (env.bindRootOverlayBaseNonEmpty) {
-            plan_run_cmd(p,
-                         (elevateTool + " " + snapshotLib + " cleanup_overlay " + env.applicationName).toStdString(),
-                         true);
+            plan_proc_root(p, "cleanup_overlay", {env.applicationName.toStdString()}, true);
         }
         plan_abort(p, "cleanUp exit: not started");
         return p;
@@ -98,7 +102,7 @@ WorkCppPlan WorkCleanupQtPlanOracle::planCleanup(const SettingsFields &settings,
     plan_run_cmd(p, "STDIO_FLUSH_STDOUT", true);
 
     // Step 6: Kill mksquashfs
-    plan_run_cmd(p, (elevateTool + " " + snapshotLib + " kill_mksquashfs").toStdString(), true);
+    plan_proc_root(p, "kill_mksquashfs", {}, true);
 
     // Step 7: Sync
     plan_process_execute(p, "sync", {}, -1);
@@ -108,12 +112,12 @@ WorkCppPlan WorkCleanupQtPlanOracle::planCleanup(const SettingsFields &settings,
 
     // Step 9: Run cleanup if cleanup.conf exists
     if (env.cleanupConfExists) {
-        plan_run_cmd(p, (elevateTool + " " + snapshotLib + " cleanup").toStdString(), false);
+        plan_proc_root(p, "cleanup", {}, false);
     }
 
     // Step 10: Cleanup bind-root overlay
     if (env.bindRootOverlayBaseNonEmpty) {
-        plan_run_cmd(p, (elevateTool + " " + snapshotLib + " cleanup_overlay " + env.applicationName).toStdString(), true);
+        plan_proc_root(p, "cleanup_overlay", {env.applicationName.toStdString()}, true);
     }
 
     // Step 11: Remove accounts reset marker
@@ -132,7 +136,7 @@ WorkCppPlan WorkCleanupQtPlanOracle::planCleanup(const SettingsFields &settings,
     // Step 14: Handle completion
     if (env.done) {
         plan_message(p, QObject::tr("Done").toStdString());
-        plan_run_cmd(p, (elevateTool + " " + snapshotLib + " copy_log").toStdString(), true);
+        plan_proc_root(p, "copy_log", {}, true);
         
         if (settings.shutdown) {
             plan_file_copy(p,
@@ -144,7 +148,7 @@ WorkCppPlan WorkCleanupQtPlanOracle::planCleanup(const SettingsFields &settings,
         plan_abort(p, "cleanUp exit: success");
     } else {
         plan_message(p, QObject::tr("Interrupted or failed to complete").toStdString());
-        plan_run_cmd(p, (elevateTool + " " + snapshotLib + " copy_log").toStdString(), true);
+        plan_proc_root(p, "copy_log", {}, true);
         plan_abort(p, "cleanUp exit: failure");
     }
 

@@ -70,21 +70,17 @@ static void plan_clean_up(WorkCppPlan &p,
                           const WorkSetupEnvQtPlanOracle::Env &env,
                           const std::string &reason)
 {
-    const QString snapshotLib = QStringLiteral("/usr/lib/") + env.applicationName + QStringLiteral("/snapshot-lib");
-    plan_run_cmd(p, (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" chown_conf")).toStdString(), true);
+    plan_proc_root(p, "chown_conf", {}, true);
 
     if (!env.cleanUp_started) {
         plan_temp_dir_remove(p, "initrd_dir");
-        plan_run_cmd(p,
-                     (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" cleanup_overlay ") + env.applicationName)
-                         .toStdString(),
-                     true);
+        plan_proc_root(p, "cleanup_overlay", {env.applicationName.toStdString()}, true);
         plan_abort(p, std::string("cleanUp exit: ") + reason);
         return;
     }
 
     plan_message(p, QObject::tr("Cleaning...").toStdString());
-    plan_run_cmd(p, (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" kill_mksquashfs")).toStdString(), true);
+    plan_proc_root(p, "kill_mksquashfs", {}, true);
     plan_process_execute(p, "sync", {}, -1);
 
     {
@@ -94,27 +90,24 @@ static void plan_clean_up(WorkCppPlan &p,
     }
 
     if (env.cleanUp_cleanupConfExists) {
-        plan_run_cmd(p, (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" cleanup")).toStdString(), false);
+        plan_proc_root(p, "cleanup", {}, false);
     }
 
     if (env.cleanUp_bindRootOverlayBaseNonEmpty) {
-        plan_run_cmd(p,
-                     (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" cleanup_overlay ") + env.applicationName)
-                         .toStdString(),
-                     true);
+        plan_proc_root(p, "cleanup_overlay", {env.applicationName.toStdString()}, true);
     }
     plan_file_remove(p, "/var/lib/mxdebian/.mxsnapshot_accounts_reset.stp");
     plan_temp_dir_remove(p, "initrd_dir");
 
     if (env.cleanUp_done) {
         plan_message(p, QObject::tr("Done").toStdString());
-        plan_run_cmd(p, (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" copy_log")).toStdString(), true);
+        plan_proc_root(p, "copy_log", {}, true);
         plan_abort(p, std::string("cleanUp exit: ") + reason);
         return;
     }
 
     plan_message(p, QObject::tr("Interrupted or failed to complete").toStdString());
-    plan_run_cmd(p, (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" copy_log")).toStdString(), true);
+    plan_proc_root(p, "copy_log", {}, true);
     plan_abort(p, std::string("cleanUp exit: ") + reason);
 }
 
@@ -151,8 +144,7 @@ WorkCppPlan WorkSetupEnvQtPlanOracle::planSetupEnv(const SettingsFields &setting
 
     // writeSnapshotInfo()
     {
-        const QString snapshotLib = QStringLiteral("/usr/lib/") + env.applicationName + QStringLiteral("/snapshot-lib");
-        plan_run_cmd(p, (env.elevateTool + QStringLiteral(" ") + snapshotLib + QStringLiteral(" datetime_log")).toStdString(), true);
+        plan_proc_root(p, "datetime_log", {}, true);
     }
 
     // writeVersionFile()

@@ -76,13 +76,13 @@ std::string CommandRunner::elevationTool()
     const bool cli = CommandRunner::isCliMode();
     if (cli) {
         if (file_exists("/usr/bin/sudo")) return std::string("/usr/bin/sudo");
+        if (file_exists("/usr/bin/doas")) return std::string("/usr/bin/doas");
         if (file_exists("/usr/bin/gksu")) return std::string("/usr/bin/gksu");
-        if (file_exists("/usr/bin/pkexec")) return std::string("/usr/bin/pkexec");
         return {};
     }
-    if (file_exists("/usr/bin/pkexec")) return std::string("/usr/bin/pkexec");
-    if (file_exists("/usr/bin/gksu")) return std::string("/usr/bin/gksu");
     if (file_exists("/usr/bin/sudo")) return std::string("/usr/bin/sudo");
+    if (file_exists("/usr/bin/doas")) return std::string("/usr/bin/doas");
+    if (file_exists("/usr/bin/gksu")) return std::string("/usr/bin/gksu");
     return {};
 }
 
@@ -211,7 +211,7 @@ CommandRunner::Result CommandRunner::helperProc(const std::vector<std::string> &
         out.started = false;
         out.exitCode = 1;
         out.normalExit = true;
-        out.stderrText = "No elevation tool found (pkexec/gksu/sudo).\n";
+        out.stderrText = "No elevation tool found (sudo/doas/gksu).\n";
         out.mergedText = out.stderrText;
         return out;
     }

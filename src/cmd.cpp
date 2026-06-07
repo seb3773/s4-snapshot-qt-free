@@ -67,7 +67,7 @@ QString Cmd::getOutAsRoot(const QString &cmd, const QStringList &args, QuietMode
 bool Cmd::helperProc(const QStringList &helperArgs, QString *output, const QByteArray *input, QuietMode quiet)
 {
     if (getuid() != 0 && elevationToolPath.isEmpty()) {
-        const QString message = QObject::tr("No elevation tool found (pkexec/gksu/sudo).");
+        const QString message = QObject::tr("No elevation tool found (sudo/doas/gksu).");
         qWarning().noquote() << message;
         return false;
     }
@@ -178,13 +178,13 @@ QString Cmd::elevationTool()
     const bool cli = Cmd::isCliMode();
     if (cli) {
         if (FileCpp::exists("/usr/bin/sudo")) return QStringLiteral("/usr/bin/sudo");
+        if (FileCpp::exists("/usr/bin/doas")) return QStringLiteral("/usr/bin/doas");
         if (FileCpp::exists("/usr/bin/gksu")) return QStringLiteral("/usr/bin/gksu");
-        if (FileCpp::exists("/usr/bin/pkexec")) return QStringLiteral("/usr/bin/pkexec");
         return {};
     }
-    if (FileCpp::exists("/usr/bin/pkexec")) return QStringLiteral("/usr/bin/pkexec");
-    if (FileCpp::exists("/usr/bin/gksu")) return QStringLiteral("/usr/bin/gksu");
     if (FileCpp::exists("/usr/bin/sudo")) return QStringLiteral("/usr/bin/sudo");
+    if (FileCpp::exists("/usr/bin/doas")) return QStringLiteral("/usr/bin/doas");
+    if (FileCpp::exists("/usr/bin/gksu")) return QStringLiteral("/usr/bin/gksu");
     return {};
 }
 
@@ -247,7 +247,7 @@ QString Cmd::getOutAsRoot(const QString &cmd, const QStringList &args, QuietMode
 bool Cmd::helperProc(const QStringList &helperArgs, QString *output, const QByteArray *input, QuietMode quiet)
 {
     if (getuid() != 0 && elevationToolPath.isEmpty()) {
-        const QString message = tr("No elevation tool found (pkexec/gksu/sudo).");
+        const QString message = tr("No elevation tool found (sudo/doas/gksu).");
         qWarning().noquote() << message;
         emit errorAvailable(message);
         emit done();

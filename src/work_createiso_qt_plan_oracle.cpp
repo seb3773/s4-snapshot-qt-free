@@ -164,8 +164,7 @@ WorkCppPlan WorkCreateIsoQtPlanOracle::planCreateIso(const SettingsFields &setti
                  false);
     plan_chdir(p, settings.workDir.toStdString());
 
-    const QString snapshotLib = QStringLiteral("/usr/lib/") + env.applicationName + QStringLiteral("/snapshot-lib");
-    plan_run_cmd(p, env.elevateTool.toStdString() + " " + snapshotLib.toStdString() + " cleanup", true);
+    plan_proc_root(p, "cleanup", {}, true);
 
     plan_chdir(p, (settings.workDir + QStringLiteral("/iso-template")).toStdString());
 

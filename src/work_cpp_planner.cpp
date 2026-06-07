@@ -121,39 +121,35 @@ static void plan_clean_up(WorkCppPlan &p,
                           const WorkCppPlanner::SetupEnvEnv &env,
                           const std::string &reason)
 {
-    const std::string snapshotLib = std::string("/usr/lib/") + env.applicationName + "/snapshot-lib";
-
-    plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " chown_conf", true);
+    plan_proc_root(p, "chown_conf", {}, true);
 
     if (!env.cleanUp_started) {
         plan_temp_dir_remove(p, "initrd_dir");
         if (env.cleanUp_bindRootOverlayBaseNonEmpty) {
-            plan_run_cmd(p,
-                         env.elevateTool + " " + snapshotLib + " cleanup_overlay " + env.applicationName,
-                         true);
+            plan_proc_root(p, "cleanup_overlay", {env.applicationName}, true);
         }
         plan_abort(p, std::string("cleanUp exit: ") + reason);
         return;
     }
 
     plan_message(p, "Cleaning...");
-    plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " kill_mksquashfs", true);
+    plan_proc_root(p, "kill_mksquashfs", {}, true);
     plan_process_execute(p, "sync", {}, -1);
     plan_chdir(p, "/");
 
     if (env.cleanUp_cleanupConfExists) {
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " cleanup", false);
+        plan_proc_root(p, "cleanup", {}, false);
     }
 
     if (env.cleanUp_bindRootOverlayBaseNonEmpty) {
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " cleanup_overlay " + env.applicationName, true);
+        plan_proc_root(p, "cleanup_overlay", {env.applicationName}, true);
     }
     plan_file_remove(p, "/var/lib/mxdebian/.mxsnapshot_accounts_reset.stp");
     plan_temp_dir_remove(p, "initrd_dir");
 
     if (env.cleanUp_done) {
         plan_message(p, "Done");
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " copy_log", true);
+        plan_proc_root(p, "copy_log", {}, true);
         if (settings.shutdown) {
             plan_file_copy(p,
                            std::string("/tmp/") + env.applicationName + ".log",
@@ -166,7 +162,7 @@ static void plan_clean_up(WorkCppPlan &p,
     }
 
     plan_message(p, "Interrupted or failed to complete");
-    plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " copy_log", true);
+    plan_proc_root(p, "copy_log", {}, true);
     plan_abort(p, std::string("cleanUp exit: ") + reason);
 }
 
@@ -324,8 +320,7 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
     plan_chdir(p, settings.workDir);
 
     // --- cleanup
-    const std::string snapshotLib = "/usr/lib/" + env.applicationName + "/snapshot-lib";
-    plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " cleanup", true);
+    plan_proc_root(p, "cleanup", {}, true);
 
     // --- xorriso stage
     plan_chdir(p, settings.workDir + "/iso-template");
@@ -508,8 +503,7 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
 
     // writeSnapshotInfo()
     {
-        const std::string snapshotLib = std::string("/usr/lib/") + env.applicationName + "/snapshot-lib";
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " datetime_log", true);
+        plan_proc_root(p, "datetime_log", {}, true);
     }
 
     // writeVersionFile()
@@ -673,18 +667,14 @@ WorkCppPlan WorkCppPlanner::planCleanup(const SettingsCpp & /*settings*/, const 
 {
     WorkCppPlan p;
 
-    const std::string snapshotLib = std::string("/usr/lib/") + env.applicationName + "/snapshot-lib";
-
     // Step 1: chown_conf - restore file ownership
-    plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " chown_conf", true);
+    plan_proc_root(p, "chown_conf", {}, true);
 
     // Step 2: Handle early exit if not started
     if (!env.started) {
         plan_temp_dir_remove(p, "initrd_dir");
         if (env.bindRootOverlayBaseNonEmpty) {
-            plan_run_cmd(p,
-                         env.elevateTool + " " + snapshotLib + " cleanup_overlay " + env.applicationName,
-                         true);
+            plan_proc_root(p, "cleanup_overlay", {env.applicationName}, true);
         }
         plan_abort(p, "cleanUp exit: not started");
         return p;
@@ -708,7 +698,7 @@ WorkCppPlan WorkCppPlanner::planCleanup(const SettingsCpp & /*settings*/, const 
     }
 
     // Step 6: Kill mksquashfs processes
-    plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " kill_mksquashfs", true);
+    plan_proc_root(p, "kill_mksquashfs", {}, true);
 
     // Step 7: Sync filesystem
     plan_process_execute(p, "sync", {}, -1);
@@ -718,12 +708,12 @@ WorkCppPlan WorkCppPlanner::planCleanup(const SettingsCpp & /*settings*/, const 
 
     // Step 9: Run cleanup script if cleanup.conf exists
     if (env.cleanupConfExists) {
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " cleanup", false);
+        plan_proc_root(p, "cleanup", {}, false);
     }
 
     // Step 10: Cleanup bind-root overlay
     if (env.bindRootOverlayBaseNonEmpty) {
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " cleanup_overlay " + env.applicationName, true);
+        plan_proc_root(p, "cleanup_overlay", {env.applicationName}, true);
     }
 
     // Step 11: Remove accounts reset marker file
@@ -743,7 +733,7 @@ WorkCppPlan WorkCppPlanner::planCleanup(const SettingsCpp & /*settings*/, const 
     if (env.done) {
         // Success path
         plan_message(p, "Done");
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " copy_log", true);
+        plan_proc_root(p, "copy_log", {}, true);
         
         if (env.shutdownRequested) {
             plan_file_copy(p,
@@ -756,7 +746,7 @@ WorkCppPlan WorkCppPlanner::planCleanup(const SettingsCpp & /*settings*/, const 
     } else {
         // Failure path
         plan_message(p, "Interrupted or failed to complete");
-        plan_run_cmd(p, env.elevateTool + " " + snapshotLib + " copy_log", true);
+        plan_proc_root(p, "copy_log", {}, true);
         plan_abort(p, "cleanUp exit: failure");
     }
 

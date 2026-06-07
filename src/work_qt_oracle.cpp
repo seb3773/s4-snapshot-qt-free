@@ -360,9 +360,7 @@ bool WorkQtOracle::checkInstalled(const QString &package)
 
 void WorkQtOracle::cleanUp()
 {
-    const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-    const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " chown_conf", CommandRunner::QuietMode::Yes);
+    (void)procAsRoot("chown_conf", {}, nullptr, CommandRunner::QuietMode::Yes);
     if (!started) {
         initrd_dir.remove();
         cleanupBindRootOverlay();
@@ -375,12 +373,11 @@ void WorkQtOracle::cleanUp()
     emit message(tr("Cleaning..."));
     (void)StdioCpp::write(stdout, "\033[?25h");
     (void)StdioCpp::flush(stdout);
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " kill_mksquashfs", CommandRunner::QuietMode::Yes);
+    (void)procAsRoot("kill_mksquashfs", {}, nullptr, CommandRunner::QuietMode::Yes);
     (void)ProcessRunner::execute("sync", {});
     (void)DirCpp::setCurrent("/");
     if (FileCpp::exists("/tmp/installed-to-live/cleanup.conf")) {
-        const QString elevateTool2 = QString::fromStdString(CommandRunner::elevationTool());
-        (void)runCommandLine(elevateTool2 + " " + snapshotLib + " cleanup");
+        (void)procAsRoot("cleanup", {}, nullptr, CommandRunner::QuietMode::No);
     }
     cleanupBindRootOverlay();
     (void)FileCpp::remove("/var/lib/mxdebian/.mxsnapshot_accounts_reset.stp");
@@ -388,7 +385,7 @@ void WorkQtOracle::cleanUp()
     settings->tmpdir.reset();
     if (done) {
         emit message(tr("Done"));
-        (void)runCommandLine(elevateTool + " " + snapshotLib + " copy_log", CommandRunner::QuietMode::Yes);
+        (void)procAsRoot("copy_log", {}, nullptr, CommandRunner::QuietMode::Yes);
         if (settings->shutdown) {
             (void)FileCpp::copy(("/tmp/" + QCoreApplication::applicationName() + ".log").toStdString(),
                                 (settings->snapshotDir + "/" + settings->snapshotName + ".log").toStdString());
@@ -402,7 +399,7 @@ void WorkQtOracle::cleanUp()
 #endif
     } else {
         emit message(tr("Interrupted or failed to complete"));
-        (void)runCommandLine(elevateTool + " " + snapshotLib + " copy_log", CommandRunner::QuietMode::Yes);
+        (void)procAsRoot("copy_log", {}, nullptr, CommandRunner::QuietMode::Yes);
 #ifdef UNIT_TESTS
         throw UnitTestExit{EXIT_FAILURE};
 #else
@@ -419,9 +416,7 @@ bool WorkQtOracle::checkAndMoveWorkDir(const QString &dir, quint64 req_size)
             != FileSystemUtilsCpp::deviceId((settings->snapshotDir + "/").toStdString())
         && FileSystemUtilsCpp::getFreeSpaceKiB(dir.toStdString()) > req_size) {
         if (FileCpp::exists("/tmp/installed-to-live/cleanup.conf")) {
-            const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-            const QString elevateTool2 = QString::fromStdString(CommandRunner::elevationTool());
-            (void)runCommandLine(elevateTool2 + " " + snapshotLib + " cleanup");
+            (void)procAsRoot("cleanup", {}, nullptr, CommandRunner::QuietMode::No);
         }
         settings->tempDirParent = dir;
         if (!settings->checkTempDir()) {
@@ -515,10 +510,7 @@ void WorkQtOracle::cleanupBindRootOverlay()
         bindRootPath = "/.bind-root";
         return;
     }
-    const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-    const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " cleanup_overlay " + QCoreApplication::applicationName(),
-                         CommandRunner::QuietMode::Yes);
+    (void)procAsRoot("cleanup_overlay", {QCoreApplication::applicationName()}, nullptr, CommandRunner::QuietMode::Yes);
     bindRootOverlayActive = false;
     bindRootOverlayBase.clear();
     bindRootPath = "/.bind-root";
@@ -646,9 +638,7 @@ bool WorkQtOracle::createIso(const QString &filename)
     (void)runCommandLine("mv iso-template/antiX/linuxfs* iso-2/antiX");
     makeChecksum(HashType::md5, settings->workDir + "/iso-2/antiX", "linuxfs");
 
-    const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-    const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " cleanup");
+    (void)procAsRoot("cleanup", {}, nullptr, CommandRunner::QuietMode::No);
 
     // Create the iso file
     (void)DirCpp::setCurrent((settings->workDir + "/iso-template").toStdString());
@@ -753,9 +743,7 @@ void WorkQtOracle::makeChecksum(WorkQtOracle::HashType hash_type, const QString 
     } else {
         // Free pagecache
         (void)runCommandLine("sync; sleep 1");
-        const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-        const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
-        (void)runCommandLine(elevateTool + " " + snapshotLib + " drop_caches");
+        (void)procAsRoot("drop_caches", {}, nullptr, CommandRunner::QuietMode::No);
         (void)runCommandLine("sleep 1");
         cmd = checksum_tmp;
     }
@@ -934,9 +922,7 @@ void WorkQtOracle::writeLsbRelease()
 // Write date of the snapshot in a "snapshot_created" file
 void WorkQtOracle::writeSnapshotInfo()
 {
-    const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-    const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " datetime_log", CommandRunner::QuietMode::Yes);
+    (void)procAsRoot("datetime_log", {}, nullptr, CommandRunner::QuietMode::Yes);
 }
 
 void WorkQtOracle::writeVersionFile()

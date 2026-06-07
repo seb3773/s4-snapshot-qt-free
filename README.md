@@ -15,7 +15,9 @@ Summary: S4 Snapshot creates bootable live ISO images from running Debian-based 
 
 - **zero Qt dependencies**: CLI binary (`iso-snapshot-cli`) and helper tools have no Qt runtime requirements
 - **100% functional Equivalence**: Byte-for-byte output validation against original Qt implementation
-- **clean rchitecture**: "Plan-Execute" pattern with immutable data structures
+- **clean architecture**: "Plan-Execute" pattern with immutable data structures
+- **embedded runtime assets**: live-files and ISO templates are compiled into the CLI/GUI binaries
+- **granular privilege elevation**: the main frontend runs as the user; only allowlisted helper actions run as root
 - **comprehensive tests**: 60+ Qt primitives replaced and validated through oracle tests
 
 ## Architecture:
@@ -25,13 +27,12 @@ Summary: S4 Snapshot creates bootable live ISO images from running Debian-based 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     User Interfaces                         │
-├──────────────────┬──────────────────┬──────────────────-────┤
-│   Qt6 GUI        │   CLI (Qt-free)  │   Helper (Qt-free)    │
-│ (src_gui_qt6_    │  (main_cli_cpp)  │     (helper.cpp)      │
-│  cpp_backend/)   │                  │                       │
-└────────┬─────────┴────────┬─────────┴─────-─────┬───────────┘
-         │                  │                     │
-         └──────────────────┼─────────────────────┘
+├───────────────────────────┬─────────────────────────────────┤
+│ Qt6 GUI                    │ CLI / other frontends           │
+│ (src_gui_qt6_cpp_backend/) │ (main_cli_cpp, TUI, custom UI)  │
+└──────────────┬────────────┴──────────────┬──────────────────┘
+               │                           │
+               └───────────────────────────┘
                             │
          ┌──────────────────▼──────────────────┐
          │   BatchprocessingCppRunner          │
@@ -51,8 +52,18 @@ Summary: S4 Snapshot creates bootable live ISO images from running Debian-based 
          ┌──────────────────▼──────────────────┐
          │   WorkCppExecutor                   │
          │   (command execution engine)        │
-         └─────────────────────────────────────┘
+         └───────────────┬───────────┬─────────┘
+                         │           │
+        ┌────────────────▼───┐   ┌───▼────────────────────┐
+        │ Embedded assets     │   │ Privileged helper      │
+        │ workDir/_embedded/  │   │ /usr/lib/<app>/helper  │
+        │ + workDir/iso-tree  │   │ exec <allowed-action>  │
+        └────────────────────┘   └────────────────────────┘
 ```
+
+The helper is not a frontend. It is the privileged boundary used by frontends
+when the backend needs root-only operations such as mounts, ownership changes,
+`mksquashfs`, cleanup, or the native `installed-to-live` workflow.
 
 ### Plan-Execute Pattern
 
@@ -71,16 +82,39 @@ s4-snapshot-port/
 │   ├── work_cpp_*.{h,cpp}       # Work method implementations
 │   ├── batchprocessing_cpp_*.{h,cpp}  # Orchestration layer
 │   ├── settings_cpp*.{h,cpp}    # Configuration management
+│   ├── embedded/                # LZ4/tar embedded asset runtime
 │   ├── command_line_parser_std.* # Qt-free CLI parser
 │   ├── i18n_cli.*               # Qt-free translation system
 │   ├── main_cli_cpp.cpp         # CLI entry point (Qt-free)
-│   ├── helper.cpp               # System helper tool (Qt-free)
+│   ├── helper.cpp               # Privileged allowlisted helper (Qt-free)
 │   ├── *_qt_oracle.{h,cpp}      # Oracle tests (Qt vs C++ validation)
 │   └── mainwindow.*, work.*     # Legacy GUI files (reference only)
 │
 ├── src_gui_qt6_cpp_backend/     # Active Qt6 GUI (uses C++ backend)
 │   ├── mainwindow.{h,cpp,ui}    # GUI implementation
 │   └── main.cpp                 # GUI entry point
+│
+├── data/                         # Build-time sources embedded into binaries
+│   ├── live-files/              # Runtime live-files tree
+│   └── iso-templates/           # Unpacked ISO template sources
+│       ├── iso-template/
+│       └── template-initrd/
+│
+├── cmake/
+│   └── EmbeddedAssets.cmake      # CMake integration for embedded payloads
+│
+├── scripts/
+│   └── build_embedded_payloads.sh # Builds live_files + iso_templates payloads
+│
+├── tools/
+│   ├── asset_pack.c             # Build-time LZ4 packer
+│   └── asset_unpack.c           # Round-trip verifier / unpacker
+│
+├── compressor/                   # Build-time LZ4 compressor sources
+├── decompressor/                 # Runtime LZ4 decompressor sources
+├── third_party/microtar/         # Tar reader used by embedded assets runtime
+│
+├── debian/                       # Debian packaging (helper installed, no polkit)
 │
 ├── tests/                        # Comprehensive test suite
 │   └── unit_tests.cpp           # Oracle validation tests
@@ -190,13 +224,13 @@ No Qt includes in Qt-free source files and no Qt libraries linked into Qt-free b
 ### CLI
 
 # Create ISO from running system
-sudo iso-snapshot-cli --file my-system.iso
+iso-snapshot-cli --file my-system.iso
 
 # Specify compression
-sudo iso-snapshot-cli --file my-system.iso --compression zstd
+iso-snapshot-cli --file my-system.iso --compression zstd
 
 # Custom kernel
-sudo iso-snapshot-cli --file my-system.iso --kernel 6.1.0-18-amd64
+iso-snapshot-cli --file my-system.iso --kernel 6.1.0-18-amd64
 
 # show help
 iso-snapshot-cli --help
@@ -207,13 +241,16 @@ iso-snapshot-cli --version
 ### GUI
 
 # run GUI
-sudo s4-snapshot
+s4-snapshot
 
 
 ### Helper tool
 
-# system helper (used internally)
-sudo helper <command>
+# privileged system helper (used internally)
+sudo /usr/lib/s4-snapshot/helper exec <allowed-command> [args...]
+
+The main CLI/GUI process should normally run as the logged-in user. Privileged
+operations are delegated to the helper only when needed.
 
 ## Backend API
 
@@ -286,8 +323,8 @@ Coverage:
 ### Integration testing:
 
 
-# Create test ISO (requires root)
-sudo ./build-make/iso-snapshot-cli --file test.iso
+# Create test ISO (privileged steps are delegated to the helper)
+./build-make/iso-snapshot-cli --file test.iso
 
 # Verify ISO created
 ls -lh test.iso
@@ -339,6 +376,70 @@ Backend tools: all backend tools have been ported to pure C++:
 The backend no longer depends on the external `/usr/sbin/installed-to-live` script from `s4-remaster` for the snapshot preparation path. Calls to `installed-to-live` are intercepted by the root helper and executed by `InstalledToLiveCpp`, a Qt-free C++ implementation of the subset used by S4 Snapshot.
 
 Implemented commands include `start`, `bind=`, `empty=`, `live-files`, `general-files`, `general`, `passwd`, `version-file`, `adjtime`, `grubdefault`, `resumedisable`, `tdmnoautologin`, `sddmnoautologin`, `read-only`, `read-write`, `cleanup`, and `exclude`. This removes the runtime dependency on the script while keeping the existing planner flow and root helper elevation model.
+
+### Privilege elevation model
+
+The backend is designed to run the main application as the logged-in user and
+request administrator privileges only for the specific operations that need
+them. The Qt-free `helper` binary is the privileged boundary:
+
+```
+frontend (CLI, TUI, GUI, etc.)
+    -> backend core
+        -> elevation tool
+            -> /usr/lib/<app>/helper exec <allowed-command> [args...]
+```
+
+The helper keeps a strict allowlist of commands and implements the native
+`installed-to-live` workflow internally. It is not a general-purpose shell.
+
+For the CLI frontend, `sudo` is the default and most portable elevation tool:
+
+```bash
+sudo /usr/lib/iso-snapshot-cli/helper exec mount --bind / /tmp/root
+```
+
+For graphical frontends, the backend intentionally does not mandate one
+authentication mechanism. The UI author should pick the approach that fits the
+framework and platform: `sudo`, `doas`, a framework-specific password dialog, or
+another local policy mechanism. Polkit is not required by the backend.
+
+A simple Qt-style approach is to ask for the password in the GUI and feed it to
+`sudo -S` while running only the helper as root:
+
+```cpp
+QProcess proc;
+
+proc.start("sudo", {
+    "-S",
+    "-p",
+    "",
+    "/usr/lib/s4-snapshot/helper",
+    "exec",
+    "mount",
+    "--bind",
+    "/",
+    "/tmp/root"
+});
+
+if (!proc.waitForStarted()) {
+    return;
+}
+
+const QString password = askPassword();
+proc.write((password + "\n").toUtf8());
+proc.closeWriteChannel();
+proc.waitForFinished();
+
+const int rc = proc.exitCode();
+const QByteArray err = proc.readAllStandardError();
+if (rc != 0 || err.contains("incorrect password") || err.contains("Sorry, try again")) {
+    // Authentication failed or the privileged command failed.
+}
+```
+
+The password must never be logged or stored. It should live only long enough to
+feed `sudo` for the helper invocation.
 
 ### Embedded runtime assets
 
@@ -415,7 +516,7 @@ All changes must:
 ## limitations
 
 Debian-based only**: Currently supports Antix (not so sure by now, but I need to check) and Q4OS (for sure).
-Root required**: ISO creation requires root privileges  
+Privilege escalation required**: ISO creation needs administrator privileges for selected steps, but the main frontend should run as the logged-in user and delegate those steps to the helper.
 
 
 ## in case of issues:
@@ -434,15 +535,15 @@ sudo apt install squashfs-tools xorriso
 ### Runtime Issues
 
 **Permission denied**:
-# ISO creation requires root !
-sudo iso-snapshot-cli --file my-system.iso
+# verify that an elevation tool can run the helper
+sudo /usr/lib/iso-snapshot-cli/helper exec true
 
 **Insufficient space**:
 # check available space:
 df -h /home/snapshot
 
 # use different directory:
-sudo iso-snapshot-cli --file my-system.iso --directory /path/to/space
+iso-snapshot-cli --file my-system.iso --directory /path/to/space
 
 **Translation not found**:
 # check locale
@@ -476,7 +577,7 @@ See [`LICENSE`](LICENSE) for full license text.
 - **Debian Team** - Debian integration
 - **MX Linux Team** - MX-specific features
 - **Q4OS Team** - Q4OS support and specific features
-- **seb3773** - QT-free porting
+- **seb3773** - QT-free porting/enhancements
 
 ----
 

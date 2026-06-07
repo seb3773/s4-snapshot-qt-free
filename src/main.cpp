@@ -401,7 +401,7 @@ int main(int argc, char *argv[])
     if (getuid() != 0 && (!isGuiApp || !hasAuthTools)) {
         qDebug().noquote() << QString::fromStdString(AppTranslatorCpp::tQt(
                                  "QObject",
-                                 "You must run this program with sudo or pkexec."));
+                                 "No supported elevation tool found (sudo/doas/gksu)."));
         return EXIT_FAILURE;
     }
 

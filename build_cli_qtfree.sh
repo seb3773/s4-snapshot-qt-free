@@ -95,8 +95,8 @@ echo "To test:"
 echo "  $BUILD_DIR/iso-snapshot-cli --help"
 echo "  $BUILD_DIR/iso-snapshot-cli --version"
 echo ""
-echo "To create an ISO (requires root):"
-echo "  sudo $BUILD_DIR/iso-snapshot-cli --file my-system.iso"
+echo "To create an ISO (privileged steps use helper elevation):"
+echo "  $BUILD_DIR/iso-snapshot-cli --file my-system.iso"
 echo ""
 
 # Made with Bob
