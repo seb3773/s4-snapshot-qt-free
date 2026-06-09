@@ -1,6 +1,7 @@
 #pragma once
 
 #include "settings_cpp.h"
+#include "work_space_cpp.h"
 
 #include <functional>
 #include <string>
@@ -24,4 +25,13 @@ public:
     static std::string getFreeSpaceStringsLikeSettingsQt(SettingsCpp &settings,
                                                          const std::string &path,
                                                          const Callbacks &cb);
+
+    [[nodiscard]] static std::string formatRequiredSpaceEstimateDebugLikeSettingsQt(
+        const WorkSpaceCpp::RequiredSpaceEstimate &estimate,
+        std::uint64_t freeSpaceKiB);
+
+    [[nodiscard]] static WorkSpaceCpp::RequiredSpaceEstimate getRequiredSpaceEstimateLikeSettingsQt(
+        const SettingsCpp &settings,
+        const std::string &applicationName,
+        const Callbacks &cb);
 };

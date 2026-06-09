@@ -58,7 +58,10 @@
 #include "messagehandler.h"
 #endif
 #include "command_runner.h"
+#include "config_paths.h"
 #include "process_runner.h"
+#include "settings_qt_adapter.h"
+#include "settings_space_cpp.h"
 #include "work_cpp_utils.h"
 #include "string_cpp.h"
 #include "systeminfo_cpp.h"
@@ -259,7 +262,7 @@ static QStringList g_ut_users_override;
 
 Settings::Settings()
     : applicationName(QStringLiteral("unit_tests")),
-      organizationName(QStringLiteral("MX-Linux")),
+      organizationName(QString::fromUtf8(S4SnapshotConfig::kOrganizationName)),
       x86(false),
       maxCores(1),
       monthly(false),
@@ -384,7 +387,7 @@ Settings::Settings(
       forceInstaller(getInitialSettings().forceInstaller),
       live(getInitialSettings().live),
       makeIsohybrid(getInitialSettings().makeIsohybrid),
-      configFilePath("/etc/" + this->applicationName + ".conf"),
+      configFilePath(QString::fromStdString(S4SnapshotConfig::bundledConfigPath(this->applicationName.toStdString()))),
       guiEditor(getInitialSettings().guiEditor),
       snapshotBasename(getInitialSettings().snapshotBasename),
       stamp(getInitialSettings().stamp),
@@ -403,22 +406,26 @@ Settings::Settings(
             exit(EXIT_FAILURE);
         }
 
-        const QString appName = this->applicationName;
-        const QString overlayBase = "/run/" + appName + "/bind-root-overlay";
-        bool cleanupRan = false;
-        bool cleanupOk = true;
-        if (FileCpp::exists(std::string("/tmp/installed-to-live/cleanup.conf")) || FileCpp::exists(overlayBase.toStdString())) {
-            cleanupRan = true;
-            const CommandRunner::Result cleanupResult = CommandRunner::procAsRoot(
-                "cleanup", {}, std::string(), CommandRunner::QuietMode::Yes);
-            cleanupOk = cleanupResult.started && cleanupResult.normalExit && cleanupResult.exitCode == 0;
-        }
-        const QString overlayRoot = "/run/" + appName + "/bind-root-overlay/root";
-        const bool bindRootMounted = CommandRunner::run("mountpoint -q /.bind-root", CommandRunner::QuietMode::Yes)
-            || CommandRunner::run(("mountpoint -q \"" + overlayRoot + "\"").toStdString(), CommandRunner::QuietMode::Yes);
-        if (!cleanupRan || cleanupOk || !bindRootMounted) {
-            (void)CommandRunner::procAsRoot(
-                "cleanup_overlay", {appName.toStdString()}, std::string(), CommandRunner::QuietMode::Yes);
+        if (!this->isGuiApp) {
+            const QString appName = this->applicationName;
+            const QString overlayBase = "/run/" + appName + "/bind-root-overlay";
+            bool cleanupRan = false;
+            bool cleanupOk = true;
+            const bool hasCleanupConf = FileCpp::exists(std::string("/tmp/installed-to-live/cleanup.conf"));
+            const bool hasOverlayBase = FileCpp::exists(overlayBase.toStdString());
+            if (hasCleanupConf || hasOverlayBase) {
+                cleanupRan = true;
+                const CommandRunner::Result cleanupResult = CommandRunner::procAsRoot(
+                    "cleanup", {}, std::string(), CommandRunner::QuietMode::Yes);
+                cleanupOk = cleanupResult.started && cleanupResult.normalExit && cleanupResult.exitCode == 0;
+            }
+            const QString overlayRoot = "/run/" + appName + "/bind-root-overlay/root";
+            const bool bindRootMounted = CommandRunner::run("mountpoint -q /.bind-root", CommandRunner::QuietMode::Yes)
+                || CommandRunner::run(("mountpoint -q \"" + overlayRoot + "\"").toStdString(), CommandRunner::QuietMode::Yes);
+            if ((hasOverlayBase || bindRootMounted) && (!cleanupRan || cleanupOk || bindRootMounted)) {
+                (void)CommandRunner::procAsRoot(
+                    "cleanup_overlay", {appName.toStdString()}, std::string(), CommandRunner::QuietMode::Yes);
+            }
         }
 
         loadConfig(); // Load settings from .conf file
@@ -965,7 +972,10 @@ QString Settings::getEditor() const
         }
     }
     if (isCliEditor) {
-        return "x-terminal-emulator -e " + elevate + " " + editor;
+        return QStringLiteral("x-terminal-emulator -e ") + (isRoot ? elevate + QLatin1Char(' ') : QString()) + editor;
+    }
+    if (!isRoot) {
+        return editor;
     }
     return elevate + " env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY " + editor;
 }
@@ -994,6 +1004,62 @@ int Settings::getSnapshotCount() const
     return 0;
 }
 
+namespace {
+
+constexpr std::array<std::pair<const char *, const char *>, 6> kEnglishXdgDirs = {{
+    {"DOCUMENTS", "Documents"},
+    {"DOWNLOAD", "Downloads"},
+    {"DESKTOP", "Desktop"},
+    {"MUSIC", "Music"},
+    {"PICTURES", "Pictures"},
+    {"VIDEOS", "Videos"},
+}};
+
+QString englishXdgDirValue(const QString &folder)
+{
+    for (const auto &[key, val] : kEnglishXdgDirs) {
+        if (folder == QLatin1String(key)) {
+            return QString::fromLatin1(val);
+        }
+    }
+    return {};
+}
+
+constexpr std::array<const char *, 10> kValidExcludeOptions = {{
+    "Desktop",
+    "Documents",
+    "Downloads",
+    "Flatpaks",
+    "Music",
+    "Networks",
+    "Pictures",
+    "Steam",
+    "Videos",
+    "VirtualBox",
+}};
+
+bool isValidExcludeOption(const QString &option)
+{
+    for (const char *valid : kValidExcludeOptions) {
+        if (option == QLatin1String(valid)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+QStringList validExcludeOptionNames()
+{
+    QStringList out;
+    out.reserve(static_cast<qsizetype>(kValidExcludeOptions.size()));
+    for (const char *valid : kValidExcludeOptions) {
+        out << QString::fromLatin1(valid);
+    }
+    return out;
+}
+
+} // namespace
+
 // Return the XDG User Directory for each user with different localizations than English
 QString Settings::getXdgUserDirs(const QString &folder)
 {
@@ -1007,10 +1073,6 @@ QString Settings::getXdgUserDirs(const QString &folder)
     }
 #endif
 
-    const static QHash<QString, QString> englishDirs {
-        {"DOCUMENTS", "Documents"}, {"DOWNLOAD", "Downloads"}, {"DESKTOP", "Desktop"},
-        {"MUSIC", "Music"},         {"PICTURES", "Pictures"},  {"VIDEOS", "Videos"},
-    };
     for (const QString &user : std::as_const(usersLocal)) {
         QString dir
             = QString::fromStdString(CommandRunner::getOutAsRoot(
@@ -1025,7 +1087,7 @@ QString Settings::getXdgUserDirs(const QString &folder)
                 break;
             }
         }
-        if (!dir.isEmpty() && englishDirs.value(folder) != dir.section('/', -1) && dir != "/home/" + user
+        if (!dir.isEmpty() && englishXdgDirValue(folder) != dir.section('/', -1) && dir != "/home/" + user
             && dir != "/home/" + user + '/') {
             if (startsWithLikeQt(dir, QLatin1Char('/'))) {
                 dir = removeLikeQt(dir, 0, 1);
@@ -1299,7 +1361,57 @@ QString Settings::getUsedSpace()
     return out;
 }
 
+QString Settings::getRequiredSnapshotSizeReport(const QString &applicationName) const
+{
+    if (monthly || overrideSize) {
+        return QString();
+    }
 
+    const SettingsCpp cpp = SettingsQtAdapter::fromQt(*this);
+    SettingsSpaceCpp::Callbacks cb;
+    cb.debug = [](const std::string &text) { qDebug().noquote() << QString::fromStdString(text); };
+    cb.critical = [](const std::string &text) { qCritical().noquote() << QString::fromStdString(text); };
+
+    const WorkSpaceCpp::RequiredSpaceEstimate estimate =
+        SettingsSpaceCpp::getRequiredSpaceEstimateLikeSettingsQt(cpp, applicationName.toStdString(), cb);
+
+    if (!estimate.ok) {
+#ifdef CLI_BUILD
+        return QString::fromStdString(AppTranslatorCpp::tQt("QObject", "Could not estimate snapshot size."));
+#else
+        return QObject::tr("Could not estimate snapshot size.");
+#endif
+    }
+
+    constexpr double kibToMib = 1024.0;
+    constexpr float gibFactor = 1024.0f * 1024.0f;
+    const double dataMiB = static_cast<double>(estimate.rootKiB - estimate.excludesKiB) / kibToMib;
+    const double neededMiB = static_cast<double>(estimate.requiredKiB) / kibToMib;
+    const double excludesMiB = static_cast<double>(estimate.excludesKiB) / kibToMib;
+    const QString freeGiB = QString::number(static_cast<double>(freeSpace) / gibFactor, 'f', 2) + QStringLiteral("GiB");
+
+#ifdef CLI_BUILD
+    return QString::fromStdString(
+               AppTranslatorCpp::tQt("QObject",
+                                     "Estimated snapshot size: %1 MiB\n"
+                                     "Data to include: %2 MiB (exclusions: %3 MiB, compression factor: %4%)\n"
+                                     "Free space on snapshot volume: %5"))
+        .arg(QString::number(neededMiB, 'f', 2))
+        .arg(QString::number(dataMiB, 'f', 2))
+        .arg(QString::number(excludesMiB, 'f', 2))
+        .arg(estimate.compressionPercent)
+        .arg(freeGiB);
+#else
+    return QObject::tr("Estimated snapshot size: %1 MiB\n"
+                       "Data to include: %2 MiB (exclusions: %3 MiB, compression factor: %4%)\n"
+                       "Free space on snapshot volume: %5")
+        .arg(QString::number(neededMiB, 'f', 2))
+        .arg(QString::number(dataMiB, 'f', 2))
+        .arg(QString::number(excludesMiB, 'f', 2))
+        .arg(estimate.compressionPercent)
+        .arg(freeGiB);
+#endif
+}
 
 int Settings::getDebianVerNum()
 {
@@ -1613,13 +1725,21 @@ void Settings::excludeVirtualBox(bool exclude)
     addRemoveExclusion(exclude, QStringLiteral("home/*/VirtualBox VMs"));
 }
 
+void Settings::persistSnapshotDir()
+{
+    S4SnapshotConfig::persistSnapshotDir(
+        userConfigBaseDir().toStdString(),
+        organizationName.toStdString(),
+        applicationName.toStdString(),
+        snapshotDir.toStdString());
+}
+
 // Load settings from config file
 void Settings::loadConfig()
 {
     qDebug() << "+++" << __PRETTY_FUNCTION__ << "+++";
 
-    const std::string systemPath = configFilePath.toStdString();
-    const std::map<std::string, std::string> systemKv = QSettingsCpp::nativeGeneralAllKeyValues(systemPath);
+    const std::string defaultsPath = configFilePath.toStdString();
 
     // Ensure we use the logged-in user's config location even when running under sudo/root
     const QString configDir = userConfigBaseDir();
@@ -1627,11 +1747,10 @@ void Settings::loadConfig()
     const std::string app = applicationName.toStdString();
     const std::string configDirStd = configDir.toStdString();
 
+    S4SnapshotConfig::ensureUserConfigFile(configDirStd, org, app, defaultsPath);
+
     const std::string userPrimaryPath = QSettingsCpp::nativeUserPrimaryFilePathFromBaseDir(configDirStd, org, app);
 
-    const auto userContains = [&](const std::string &key) -> bool {
-        return QSettingsCpp::nativeUserContainsKeyFromBaseDir(configDirStd, org, app, key);
-    };
     const auto userValue = [&](const std::string &key, const std::string &def) -> std::string {
         return QSettingsCpp::nativeUserValueStringFromBaseDir(configDirStd, org, app, key, def);
     };
@@ -1639,68 +1758,48 @@ void Settings::loadConfig()
         (void)QSettingsCpp::nativeGeneralSetValueString(userPrimaryPath, key, value);
     };
 
-    const QString systemSnapshotExcludes = trimQuotes(QString::fromUtf8(
-        QSettingsCpp::iniGeneralValueString(systemPath, std::string("snapshot_excludes"), std::string()).c_str()));
-    const bool userConfiguredSnapshotExcludes = userContains(std::string("snapshot_excludes"));
-
-    // Merge system settings into user settings
-    for (const auto &it : systemKv) {
-        if (!userContains(it.first)) {
-            userSet(it.first, it.second);
-        }
-    }
-
     sessionExcludes.clear();
     snapshotDir = trimQuotes(QString::fromUtf8(userValue(std::string("snapshot_dir"), std::string("/home/snapshot")).c_str()));
     if (!endsWithLikeQt(snapshotDir, QLatin1String("/snapshot"))) {
         snapshotDir = QString::fromLocal8Bit(DirCpp::cleanPath((snapshotDir + "/snapshot").toStdString()).c_str());
     }
-    const QString userConfigDir = QString::fromLocal8Bit(DirCpp::cleanPath((configDir + "/" + organizationName).toStdString()).c_str());
+    const QString userConfigDir =
+        QString::fromStdString(S4SnapshotConfig::userConfigDirFromBase(configDirStd, org));
     const QString userExcludesPath =
-        QString::fromLocal8Bit(DirCpp::cleanPath((userConfigDir + "/" + applicationName + "-exclude.list").toStdString()).c_str());
+        QString::fromStdString(S4SnapshotConfig::userExcludesPathFromBase(configDirStd, org, app));
     const QString userConfigPath = QString::fromUtf8(userPrimaryPath.c_str());
-    const QString systemExcludesPath = QString::fromLocal8Bit(DirCpp::cleanPath(("/etc/" + applicationName + "-exclude.list").toStdString()).c_str());
+    const QString bundledExcludesPath =
+        QString::fromStdString(S4SnapshotConfig::bundledExcludesPath(app));
     QString localPath = QString::fromLocal8Bit(DirCpp::cleanPath(("/usr/local/share/excludes/" + applicationName + "-exclude.list").toStdString()).c_str());
-    QString usrPath = QString::fromLocal8Bit(DirCpp::cleanPath(("/usr/share/excludes/" + applicationName + "-exclude.list").toStdString()).c_str());
+    const QString legacyBundledExcludesPath =
+        QString::fromStdString(S4SnapshotConfig::legacyBundledExcludesPath(app));
 
 #ifdef UNIT_TESTS
     const QString utFallback = Settings::ut_fallbackExcludesPathOverride();
     const QString fallbackExcludesPath = !utFallback.isEmpty() ? utFallback
-                                                               : (FileCpp::exists(localPath.toStdString()) ? localPath : usrPath);
+                                                               : (FileCpp::exists(localPath.toStdString()) ? localPath : legacyBundledExcludesPath);
     const QString utSource = Settings::ut_excludesSourcePathOverride();
     excludesSourcePath = !utSource.isEmpty() ? utSource
-                                             : (FileCpp::exists(systemExcludesPath.toStdString()) ? systemExcludesPath : fallbackExcludesPath);
+                                             : (FileCpp::exists(bundledExcludesPath.toStdString()) ? bundledExcludesPath : fallbackExcludesPath);
 #else
-    const QString fallbackExcludesPath = FileCpp::exists(localPath.toStdString()) ? localPath : usrPath;
-    excludesSourcePath = FileCpp::exists(systemExcludesPath.toStdString()) ? systemExcludesPath : fallbackExcludesPath;
+    const QString fallbackExcludesPath = FileCpp::exists(localPath.toStdString()) ? localPath : legacyBundledExcludesPath;
+    excludesSourcePath = FileCpp::exists(bundledExcludesPath.toStdString()) ? bundledExcludesPath : fallbackExcludesPath;
 #endif
-    QString configuredExcludesPath = trimQuotes(QString::fromUtf8(userValue(std::string("snapshot_excludes"), userExcludesPath.toStdString()).c_str()));
 
-    if (!userConfiguredSnapshotExcludes || configuredExcludesPath == systemSnapshotExcludes) {
-        configuredExcludesPath = userExcludesPath;
-        userSet(std::string("snapshot_excludes"), configuredExcludesPath.toStdString());
-    }
+    S4SnapshotConfig::ensureUserExcludesFile(configDirStd, org, app, excludesSourcePath.toStdString());
 
-    const bool usingDefaultUserPath = configuredExcludesPath == userExcludesPath;
-    if (usingDefaultUserPath && !FileCpp::exists(userExcludesPath.toStdString())) {
-        if (!excludesSourcePath.isEmpty() && FileCpp::exists(excludesSourcePath.toStdString())) {
-            (void)DirCpp().mkpath(userConfigDir.toStdString());
-            if (FileCpp::copy(excludesSourcePath.toStdString(), userExcludesPath.toStdString())) {
-                qDebug() << "Copied exclusion file from" << excludesSourcePath << "to" << userExcludesPath;
-                chownFileToLoggedInUser(userExcludesPath);
-            } else {
-                qWarning() << "Failed to copy exclusion file from" << excludesSourcePath << "to" << userExcludesPath;
-            }
-        }
+    const QString configuredExcludesPath = trimQuotes(QString::fromUtf8(
+        userValue(std::string("snapshot_excludes"), userExcludesPath.toStdString()).c_str()));
+    const QString canonicalExcludesPath = QString::fromStdString(S4SnapshotConfig::normalizeUserExcludesToCanonical(
+        configDirStd, org, app, configuredExcludesPath.toStdString()));
+    userSet(std::string("snapshot_excludes"), canonicalExcludesPath.toStdString());
+    if (!FileCpp::exists(canonicalExcludesPath.toStdString())) {
+        qDebug() << "User excludes file not found after normalization, seeding from:" << fallbackExcludesPath;
+        (void)FileCpp::copy(fallbackExcludesPath.toStdString(), canonicalExcludesPath.toStdString());
     }
-    if (!FileCpp::exists(configuredExcludesPath.toStdString())) {
-        qDebug() << "Configured snapshot_excludes file not found (" << configuredExcludesPath
-                 << "), using fallback path:" << fallbackExcludesPath;
-        configuredExcludesPath = fallbackExcludesPath;
-    }
-    snapshotExcludesPath = configuredExcludesPath;
+    snapshotExcludesPath = canonicalExcludesPath;
     chownFileToLoggedInUser(userConfigPath);
-    chownFileToLoggedInUser(configuredExcludesPath);
+    chownFileToLoggedInUser(canonicalExcludesPath);
     // snapshotBasename, makeIsohybrid, guiEditor, stamp, forceInstaller are now const members
     makeMd5sum = QString::fromUtf8(userValue(std::string("make_md5sum"), std::string("no")).c_str()) != "no";
     makeSha512sum = QString::fromUtf8(userValue(std::string("make_sha512sum"), std::string("no")).c_str()) != "no";
@@ -1801,6 +1900,7 @@ void Settings::processArgs(
 #endif
         if (FileCpp::exists(directory.toStdString())) {
             snapshotDir = QString::fromLocal8Bit(DirCpp::absolutePath(directory.toStdString()).c_str()) + "/snapshot";
+            persistSnapshotDir();
         } else {
             qWarning() << "Directory does not exist:" << directory;
 #ifdef UNIT_TESTS
@@ -1953,8 +2053,6 @@ void Settings::processExclArgs(
     };
 #endif
 
-    static const QSet<QString> valid_options {"Desktop",  "Documents", "Downloads", "Flatpaks", "Music",
-                                              "Networks", "Pictures",  "Steam",     "Videos",   "VirtualBox"};
     if (argParser.isSet("exclude")) {
 #ifdef CLI_BUILD
         const QStringList options = valuesQ("exclude");
@@ -1962,11 +2060,11 @@ void Settings::processExclArgs(
         const QStringList options = argParser.values("exclude");
 #endif
         for (const QString &option : options) {
-            if (valid_options.contains(option)) {
+            if (isValidExcludeOption(option)) {
                 excludeItem(option);
             } else {
                 qWarning() << "Invalid exclude option:" << option
-                         << "Please use one of these options" << valid_options.values();
+                         << "Please use one of these options" << validExcludeOptionNames();
             }
         }
     }
@@ -2076,8 +2174,9 @@ bool Settings::getEditBootMenuSetting()
         return QSettingsCpp::nativeUserValueString(org, app, std::string("edit_boot_menu"), std::string("")) != "no";
     }
 
-    const QString systemPath = QStringLiteral("/etc/") + applicationName + QStringLiteral(".conf");
-    return QSettingsCpp::iniGeneralValueString(systemPath.toStdString(), std::string("edit_boot_menu"), std::string("no")) != "no";
+    const QString defaultsPath =
+        QString::fromStdString(S4SnapshotConfig::bundledConfigPath(applicationName.toStdString()));
+    return QSettingsCpp::iniGeneralValueString(defaultsPath.toStdString(), std::string("edit_boot_menu"), std::string("no")) != "no";
 }
 
 QString Settings::trimQuotes(const QString &value) const
@@ -2110,22 +2209,22 @@ Settings::InitialSettings Settings::getInitialSettings() const
     const std::string kSnapshotBasename = std::string("snapshot_basename");
     const std::string kStamp = std::string("stamp");
 
-    const std::string systemPath = std::string("/etc/") + app + std::string(".conf");
+    const std::string defaultsPath = S4SnapshotConfig::bundledConfigPath(app);
 
-    const auto readStringUserThenSystem = [&](const std::string &key, const std::string &def) -> std::string {
+    const auto readStringUserThenDefaults = [&](const std::string &key, const std::string &def) -> std::string {
         if (QSettingsCpp::nativeUserContainsKey(org, app, key)) {
             return QSettingsCpp::nativeUserValueString(org, app, key, def);
         }
-        return QSettingsCpp::iniGeneralValueString(systemPath, key, def);
+        return QSettingsCpp::iniGeneralValueString(defaultsPath, key, def);
     };
 
     InitialSettings s;
     s.live = SystemInfoCpp::isLive();
-    s.forceInstaller = QSettingsCpp::variantStringToBoolLikeQt(readStringUserThenSystem(kForceInstaller, std::string("true")));
-    s.makeIsohybrid = readStringUserThenSystem(kMakeIsohybrid, std::string("yes")) == "yes";
-    s.guiEditor = trimQuotes(QString::fromUtf8(readStringUserThenSystem(kGuiEditor, std::string()).c_str()));
-    s.snapshotBasename = trimQuotes(QString::fromUtf8(readStringUserThenSystem(kSnapshotBasename, std::string("snapshot")).c_str()));
-    s.stamp = trimQuotes(QString::fromUtf8(readStringUserThenSystem(kStamp, std::string()).c_str()));
+    s.forceInstaller = QSettingsCpp::variantStringToBoolLikeQt(readStringUserThenDefaults(kForceInstaller, std::string("true")));
+    s.makeIsohybrid = readStringUserThenDefaults(kMakeIsohybrid, std::string("yes")) == "yes";
+    s.guiEditor = trimQuotes(QString::fromUtf8(readStringUserThenDefaults(kGuiEditor, std::string()).c_str()));
+    s.snapshotBasename = trimQuotes(QString::fromUtf8(readStringUserThenDefaults(kSnapshotBasename, std::string("snapshot")).c_str()));
+    s.stamp = trimQuotes(QString::fromUtf8(readStringUserThenDefaults(kStamp, std::string()).c_str()));
     {
         QStringList out;
         for (const std::string &u : SystemInfoCpp::listUsers()) {

@@ -1267,21 +1267,9 @@ quint64 WorkQtOracle::getRequiredSpace()
         root_size = static_cast<quint64>(WorkCppUtils::parseDuKilobytes(
             getOutAsRoot("du", {"-sx", "-P", sizeRoot}, CommandRunner::QuietMode::Yes), &ok));
     }
-    if (!settings->live) {
-        const quint64 rootTotal = static_cast<quint64>(FileSystemUtilsCpp::bytesTotal(std::string("/")));
-        const quint64 rootFree = static_cast<quint64>(FileSystemUtilsCpp::bytesFree(std::string("/")));
-        ok = (rootTotal != 0);
-        if (ok) {
-            root_size = (rootTotal - rootFree) / 1024;
-            if (includeHomeDevice) {
-                const quint64 homeTotal = static_cast<quint64>(FileSystemUtilsCpp::bytesTotal(std::string("/home")));
-                const quint64 homeFree = static_cast<quint64>(FileSystemUtilsCpp::bytesFree(std::string("/home")));
-                ok = (homeTotal != 0);
-                if (ok) {
-                    root_size += (homeTotal - homeFree) / 1024;
-                }
-            }
-        }
+    if (!settings->live && includeHomeDevice) {
+        root_size += static_cast<quint64>(WorkCppUtils::parseDuKilobytes(
+            getOutAsRoot("du", {"-sx", "-P", "/home"}, CommandRunner::QuietMode::Yes), &ok));
     }
     constexpr double kibToMib = 1024.0;
     if (!ok) {

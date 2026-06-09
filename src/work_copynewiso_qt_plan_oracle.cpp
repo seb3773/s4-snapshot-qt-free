@@ -83,11 +83,26 @@ WorkCppPlan WorkCopyNewIsoQtPlanOracle::planCopyNewIso(const SettingsFields &set
                  (QStringLiteral("EMBED_EXTRACT_ISO_TEMPLATE ") + settings.workDir + QStringLiteral("/iso-template"))
                      .toStdString(),
                  false);
-    plan_run_cmd(p,
-                 (QStringLiteral("cp /boot/vmlinuz-") + settings.kernel
-                  + QStringLiteral(" iso-template/antiX/vmlinuz"))
-                     .toStdString(),
-                 false);
+    QString kernelVersion = settings.kernel;
+    {
+        QString vmlinuzSource;
+        if (kernelVersion.startsWith(QStringLiteral("/boot/vmlinuz-"))) {
+            vmlinuzSource = kernelVersion;
+            kernelVersion = kernelVersion.mid(QStringLiteral("/boot/vmlinuz-").size());
+        } else if (kernelVersion.startsWith(QStringLiteral("vmlinuz-"))) {
+            vmlinuzSource = QStringLiteral("/boot/") + kernelVersion;
+            kernelVersion = kernelVersion.mid(QStringLiteral("vmlinuz-").size());
+        } else {
+            vmlinuzSource = QStringLiteral("/boot/vmlinuz-") + kernelVersion;
+        }
+        plan_run_cmd(p,
+                     (QStringLiteral("cp \"") + vmlinuzSource + QStringLiteral("\" iso-template/antiX/vmlinuz"))
+                         .toStdString(),
+                     false);
+        plan_run_cmd(p,
+                     "CHECK_RESULT else ERROR: Could not copy kernel (vmlinuz) into ISO template.",
+                     false);
+    }
 
     const std::string replaceMenuCmd = std::string("REPLACE_MENU_STRINGS ")
                                        + settings.workDir.toStdString() + "|" + settings.projectName.toStdString() + "|"
@@ -138,10 +153,10 @@ WorkCppPlan WorkCopyNewIsoQtPlanOracle::planCopyNewIso(const SettingsFields &set
         }
     }
 
+    const QString runtimeScriptsPath = settings.workDir + QStringLiteral("/_embedded/scripts");
     plan_run_cmd(p,
-                 (QStringLiteral("/usr/share/") + env.applicationName
-                  + QStringLiteral("/scripts/copy-initrd-modules -e -t=\"") + path
-                  + QStringLiteral("\" -k=\"") + settings.kernel + QStringLiteral("\""))
+                 (runtimeScriptsPath + QStringLiteral("/copy-initrd-modules -e -t=\"") + path
+                  + QStringLiteral("\" -k=\"") + kernelVersion + QStringLiteral("\""))
                      .toStdString(),
                  false);
     plan_proc_root(p, "copy-initrd-programs", {"-e", "--to=" + path.toStdString()}, false);

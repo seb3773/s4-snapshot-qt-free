@@ -4,6 +4,7 @@
 #include "cli_parser_kv_gen.h"
 #include "command_line_parser_std.h"
 #include "command_runner.h"
+#include "config_paths.h"
 #include "dir_cpp.h"
 #include "log.h"
 #include "logger_cpp.h"
@@ -88,12 +89,16 @@ static bool is_allowed_compression(const std::string &v)
 static SettingsProcessArgsCpp::Input make_process_args_input(const CommandLineParserStd &parser,
                                                             const std::string &currentKernel,
                                                             const std::vector<std::string> &users,
-                                                            const std::string &defaultSnapshotName)
+                                                            const std::string &defaultSnapshotName,
+                                                            const std::string &organizationName,
+                                                            const std::string &applicationName)
 {
     SettingsProcessArgsCpp::Input in;
 
     in.currentKernel = currentKernel;
     in.users = users;
+    in.organizationName = organizationName;
+    in.applicationName = applicationName;
 
     in.shutdownSet = parser.isSet("shutdown");
     in.resetSet = parser.isSet("reset");
@@ -166,7 +171,7 @@ static bool initialize_configuration_like_settings_qt()
 {
     LoggerCpp::log(LoggerCpp::Level::Debug, "+++ bool Settings::initializeConfiguration() +++");
 
-    const std::string configPath = "/etc/iso-snapshot-cli.conf";
+    const std::string configPath = S4SnapshotConfig::bundledConfigPath("iso-snapshot-cli");
     if (!FileCpp::exists(configPath)) {
         LoggerCpp::log(LoggerCpp::Level::Warning, "Configuration file does not exist: " + configPath);
         LoggerCpp::log(LoggerCpp::Level::Warning, "Using default settings");
@@ -199,7 +204,9 @@ static bool initialize_configuration_like_settings_qt()
     return true;
 }
 
-static int validate_configuration_like_settings_qt(SettingsCpp &settings, bool isCliBuild)
+static int validate_configuration_like_settings_qt(SettingsCpp &settings,
+                                                 bool isCliBuild,
+                                                 const std::string &applicationName)
 {
     // This mirrors Settings::checkConfiguration() (Qt).
     // The "+++ bool Settings::checkConfiguration() const +++" line is emitted by emit_qt_like_settings_runtime_diagnostics.
@@ -227,6 +234,16 @@ static int validate_configuration_like_settings_qt(SettingsCpp &settings, bool i
         cb.debug = [](const std::string &text) { (void)StdioCpp::write(stdout, text); };
         cb.critical = [](const std::string &text) { (void)StdioCpp::write(stdout, text); };
         (void)SettingsSpaceCpp::getFreeSpaceStringsLikeSettingsQt(settings, path, cb);
+
+        if (!settings.monthly && !settings.overrideSize) {
+            const WorkSpaceCpp::RequiredSpaceEstimate estimate =
+                SettingsSpaceCpp::getRequiredSpaceEstimateLikeSettingsQt(settings, applicationName, cb);
+            if (estimate.ok) {
+                (void)StdioCpp::write(
+                    stdout,
+                    SettingsSpaceCpp::formatRequiredSpaceEstimateDebugLikeSettingsQt(estimate, settings.freeSpace));
+            }
+        }
     }
 
     return EXIT_SUCCESS;
@@ -248,7 +265,7 @@ static void emit_qt_like_settings_runtime_diagnostics(SettingsCpp &settings, boo
 int main(int argc, char **argv)
 {
     const std::string applicationName = basename_like_qfileinfo_filename((argc > 0) ? argv[0] : nullptr);
-    const std::string organizationName = "MX-Linux";
+    const std::string organizationName = S4SnapshotConfig::kOrganizationName;
 
     if (getuid() == 0) {
         (void)setenv("XDG_RUNTIME_DIR", "/run/user/0", 1);
@@ -382,7 +399,8 @@ int main(int argc, char **argv)
         MessageHandlerCpp::showMessage(MessageHandlerCpp::Critical, title, msg);
     };
 
-    SettingsProcessArgsCpp::Input paIn = make_process_args_input(parser, currentKernel, users, settings.snapshotName);
+    SettingsProcessArgsCpp::Input paIn =
+        make_process_args_input(parser, currentKernel, users, settings.snapshotName, organizationName, applicationName);
 
     try {
         SettingsProcessArgsCpp::applyLikeSettingsQt(settings, paIn, paCb);
@@ -393,7 +411,7 @@ int main(int argc, char **argv)
     emit_qt_like_settings_runtime_diagnostics(settings, parser.value("file").empty());
 
     {
-        const int v = validate_configuration_like_settings_qt(settings, true);
+        const int v = validate_configuration_like_settings_qt(settings, true, applicationName);
         if (v != EXIT_SUCCESS) {
             return v;
         }

@@ -4,9 +4,7 @@ icons/s4-snapshot.svg		usr/share/icons/hicolor/scalable/apps
 manual/s4-snapshot.8.gz		usr/share/man/man8
 usr/bin/s4-snapshot		usr/bin
 add-calamares-desktop-icon	usr/bin
-s4-snapshot-exclude.list	etc
-s4-snapshot.conf		etc
+s4-snapshot-exclude.list	usr/share/s4-snapshot
+s4-snapshot.conf		usr/share/s4-snapshot
 s4-snapshot.desktop		usr/share/applications
-obj-*/helper			usr/lib/s4-snapshot
-scripts/*			usr/share/s4-snapshot/scripts
 obj-*/*.qm			usr/share/s4-snapshot/locale

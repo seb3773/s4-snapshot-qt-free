@@ -27,6 +27,7 @@
 
 #include <QtConcurrent>
 #include <QPointer>
+#include <QApplication>
 #include <QCoreApplication>
 #include <QCalendarWidget>
 #include <QDateTime>
@@ -43,6 +44,7 @@
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QProcess>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTextBlock>
@@ -58,8 +60,11 @@
 #include "cmd_cpp.h"
 #include "process_runner.h"
 #include "settings_cpp_builder.h"
+#include "settings_qt_adapter.h"
 #include "work_cpp_executor.h"
 #include "work_cpp_planner.h"
+#include "command_runner.h"
+#include "embedded/embedded_assets_runtime.h"
 #include <chrono>
 #include <utime.h>
 
@@ -553,14 +558,6 @@ bool MainWindow::installPackage(const QString &package)
     return true;
 }
 
-void MainWindow::cleanUp()
-{
-    ui->stackedWidget->setCurrentWidget(ui->outputPage);
-    // Call Work::cleanUp directly - this is a cleanup utility that exits the application
-    Work tempWork(settings);
-    tempWork.cleanUp();
-}
-
 void MainWindow::procStart()
 {
     timer.start(500ms);
@@ -785,31 +782,49 @@ void MainWindow::handleSettingsPage(const QString &file_name)
         return;
     }
 
-    if (!confirmStart()) {
+    applyExclusions();
+
+    QString sizeReport;
+    if (!settings->monthly && !settings->overrideSize) {
+        QString path = settings->snapshotDir;
+        path.remove(QRegularExpression("/snapshot$"));
+        (void)settings->getFreeSpaceStrings(path);
+        procStart();
+        sizeReport = settings->getRequiredSnapshotSizeReport(QCoreApplication::applicationName());
+        procDone();
+        if (!sizeReport.isEmpty()) {
+            ui->labelSummary->setText(ui->labelSummary->text() + "\n" + sizeReport);
+        }
+    }
+
+    if (!confirmStart(sizeReport)) {
         return;
     }
 
     // Timer is now tracked by m_operationInProgress flag and backend handles timing internally
     m_operationInProgress.store(true);
     if (!settings->checkSnapshotDir() || !settings->checkTempDir()) {
-        cleanUp();
+        m_operationInProgress.store(false);
         return;
     }
 
-    applyExclusions();
     prepareForOutput(file_name);
 }
 
-bool MainWindow::confirmStart()
+bool MainWindow::confirmStart(const QString &sizeReport)
 {
     QMessageBox messageBox(this);
     messageBox.setIcon(QMessageBox::Question);
     messageBox.setWindowTitle(tr("Final chance"));
-    messageBox.setText(
+    QString text =
         tr("Snapshot now has all the information it needs to create an ISO from your running system.") + "\n\n"
         + tr("It will take some time to finish, depending on the size of the installed system and the capacity of "
-             "your computer.")
-        + "\n\n" + tr("OK to start?"));
+             "your computer.");
+    if (!sizeReport.isEmpty()) {
+        text += "\n\n" + sizeReport;
+    }
+    text += "\n\n" + tr("OK to start?");
+    messageBox.setText(text);
     messageBox.addButton(QMessageBox::Ok);
     auto *pushCancel = messageBox.addButton(QMessageBox::Cancel);
     auto *checkShutdown = new QCheckBox(this);
@@ -908,10 +923,11 @@ void MainWindow::prepareForOutput(const QString &/*file_name*/)
         QCoreApplication::organizationName().toStdString()
     );
 
-    // CRITICAL FIX: Restore sessionExcludes from GUI to backend
-    // The GUI allows users to add/remove exclusions at runtime via checkboxes
-    // These are stored in settings->sessionExcludes and MUST be passed to the backend
-    // Otherwise, the space calculation will ignore user-selected exclusions
+    // GUI fields (kernel, boot options, distro metadata, dirs, etc.) live on the Qt Settings
+    // object and are not fully rebuilt by buildFromArgs().
+    SettingsQtAdapter::overlayRuntimeFromQt(cppSettings, *settings);
+
+    // applyExclusions() built sessionExcludes from checkboxes; keep that over config defaults.
     cppSettings.sessionExcludes = savedSessionExcludes;
 
     // Setup BatchprocessingCppRunner callbacks
@@ -988,14 +1004,20 @@ void MainWindow::btnBack_clicked()
 
 void MainWindow::btnEditExclude_clicked()
 {
-    hide();
-    const std::string cmd = (settings->getEditor() + " " + settings->snapshotExcludesPath).toStdString();
-    procStart();
-    (void)CmdCpp().run(cmd);
-    procDone();
+    const QString excludesPath = settings->snapshotExcludesPath;
+    if (excludesPath.isEmpty() || !QFile::exists(excludesPath)) {
+        processMsgBox(BoxType::critical, tr("Error"),
+                        tr("Exclusion file not found: %1").arg(excludesPath));
+        return;
+    }
+
+    if (!QProcess::startDetached(QStringLiteral("xdg-open"), {excludesPath})) {
+        processMsgBox(BoxType::critical, tr("Error"), tr("Could not open exclusion file with xdg-open."));
+        return;
+    }
+
     updateCustomExcludesButton();
     checkUpdatedDefaultExcludes();
-    show();
 }
 
 void MainWindow::btnRemoveCustomExclude_clicked()
@@ -1107,7 +1129,9 @@ void MainWindow::btnHelp_clicked()
 
 void MainWindow::btnSelectSnapshot_clicked()
 {
-    QString selected = QFileDialog::getExistingDirectory(this, tr("Select Snapshot Directory"), QString(),
+    QString initialDir = settings->snapshotDir;
+    initialDir.remove(QRegularExpression(QStringLiteral("/snapshot$")));
+    QString selected = QFileDialog::getExistingDirectory(this, tr("Select Snapshot Directory"), initialDir,
                                                          QFileDialog::ShowDirsOnly);
     if (!selected.isEmpty()) {
         const QString previousSnapshotDir = settings->snapshotDir;
@@ -1118,6 +1142,7 @@ void MainWindow::btnSelectSnapshot_clicked()
                                   tr("Insufficient free space in the selected directory. Please choose a different location."));
             return;
         }
+        settings->persistSnapshotDir();
         ui->labelSnapshotDir->setText(settings->snapshotDir);
         listFreeSpace();
     }
@@ -1147,16 +1172,18 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::closeApp()
 {
-    // Ask for confirmation when on outputPage and not done
     if (ui->stackedWidget->currentWidget() == ui->outputPage && m_operationInProgress.load()) {
         if (QMessageBox::Yes
             != QMessageBox::question(this, tr("Confirmation"), tr("Are you sure you want to quit the application?"),
                                      QMessageBox::Yes | QMessageBox::No)) {
             return;
         }
+        requestOperationCancel();
+        return;
     }
+
     saveWindowGeometry();
-    cleanUp();
+    QApplication::quit();
 }
 
 void MainWindow::btnCancel_clicked()
@@ -1180,14 +1207,7 @@ void MainWindow::btnCancel_clicked()
             
             // Only cancel if user confirms with "Yes"
             if (reply == QMessageBox::Yes) {
-                // Request abort
-                m_abortRequested.store(true);
-                ui->btnCancel->setEnabled(false);
-                ui->btnCancel->setText(tr("Cancelling..."));
-                processMsg(tr("Cancellation requested, please wait..."));
-                
-                // The backend will check m_abortRequested via shouldAbortBackend()
-                // and stop gracefully
+                requestOperationCancel();
             }
             // If user clicked "No", do nothing and continue the process
             return;
@@ -1276,6 +1296,22 @@ bool MainWindow::shouldAbortBackend()
     return m_abortRequested.load();
 }
 
+void MainWindow::requestOperationCancel()
+{
+    m_abortRequested.store(true);
+    EmbeddedAssetsRuntime::requestStop();
+
+    ui->btnCancel->setEnabled(false);
+    ui->btnCancel->setText(tr("Cancelling..."));
+    processMsg(tr("Cancellation requested, please wait..."));
+
+    // mksquashfs can outlive the helper/sudo wrapper; terminate it explicitly.
+    [[maybe_unused]] const QFuture<void> killFuture = QtConcurrent::run([]() {
+        (void)CommandRunner::procAsRoot("kill_mksquashfs", {}, std::string(), CommandRunner::QuietMode::Yes);
+    });
+    (void)killFuture;
+}
+
 
 // ============================================================================
 // Async Backend Execution Methods
@@ -1318,6 +1354,7 @@ void MainWindow::onBackgroundProcessingFinished()
     
     // Clear operation state
     m_operationInProgress.store(false);
+    m_abortRequested.store(false);
     
     // RE-ENABLE all controls (execution finished)
     enableControls(true);

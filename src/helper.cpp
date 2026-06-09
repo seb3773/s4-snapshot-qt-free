@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <vector>
 
+#include "embedded/embedded_assets_runtime.h"
 #include "file_cpp.h"
 #include "installed_to_live_cpp.h"
 #include "process_runner.h"
@@ -63,9 +64,6 @@ void printError(const std::string &message)
     static const std::unordered_map<std::string, std::vector<std::string>> commands {
         {"apt-get", {"/usr/bin/apt-get"}},
         {"chown", {"/usr/bin/chown", "/bin/chown"}},
-        {"copy-initrd-programs",
-         {"/usr/share/s4-snapshot/scripts/copy-initrd-programs",
-          "/usr/share/iso-snapshot-cli/scripts/copy-initrd-programs"}},
         {"du", {"/usr/bin/du", "/bin/du"}},
         {"mkdir", {"/usr/bin/mkdir", "/bin/mkdir"}},
         {"mount", {"/usr/bin/mount", "/bin/mount"}},
@@ -182,7 +180,9 @@ void printError(const std::string &message)
     if (pkillPath.empty()) {
         return 0;
     }
-    (void)runProcess(pkillPath, {"mksquashfs"});
+    (void)runProcess(pkillPath, {"-TERM", "mksquashfs"});
+    ::usleep(500'000);
+    (void)runProcess(pkillPath, {"-KILL", "mksquashfs"});
     return 0;
 }
 
@@ -273,6 +273,33 @@ void printError(const std::string &message)
     return f.write("1\n") >= 0 && f.flush() ? 0 : 1;
 }
 
+[[nodiscard]] std::string helperRuntimeScriptsDir()
+{
+    // /run is often mounted noexec; use the same exec-capable base as the embedded helper.
+    const char *xdg_runtime = std::getenv("XDG_RUNTIME_DIR");
+    if (xdg_runtime != nullptr && xdg_runtime[0] == '/') {
+        return std::string(xdg_runtime) + "/s4-snapshot/runtime-scripts";
+    }
+    return std::string("/tmp/s4-snapshot-") + std::to_string(static_cast<long long>(::getuid())) + "/runtime-scripts";
+}
+
+[[nodiscard]] int copyInitrdPrograms(const std::vector<std::string> &commandArgs, const std::string &input)
+{
+    const std::string scriptsDir = helperRuntimeScriptsDir();
+    const EmbeddedAssetsRuntime::Result extract = EmbeddedAssetsRuntime::extractRuntimeScriptsTo(scriptsDir);
+    if (!extract.ok) {
+        printError(extract.error);
+        return 127;
+    }
+
+    const std::string scriptPath = scriptsDir + "/copy-initrd-programs";
+    if (!FileCpp::exists(scriptPath) || ::access(scriptPath.c_str(), X_OK) != 0) {
+        printError(std::string("Embedded script is not executable: ") + scriptPath);
+        return 127;
+    }
+    return relayResult(runProcess(scriptPath, commandArgs, input));
+}
+
 [[nodiscard]] int runAllowedCommand(const std::string &command, const std::vector<std::string> &commandArgs,
                                     const std::string &input);
 
@@ -284,7 +311,7 @@ void printError(const std::string &message)
     }
 
     for (const std::string &app : {std::string("iso-snapshot-cli"), std::string("s4-snapshot")}) {
-        const std::string fileName = "/home/" + username + "/.config/MX-Linux/" + app + ".conf";
+        const std::string fileName = "/home/" + username + "/.config/s4-snapshot/" + app + ".conf";
         if (FileCpp::exists(fileName)) {
             (void)runAllowedCommand("chown", {username + ":", fileName}, std::string());
         }
@@ -330,6 +357,10 @@ void printError(const std::string &message)
 
     if (command == "installed-to-live") {
         return InstalledToLiveCpp::run(commandArgs);
+    }
+
+    if (command == "copy-initrd-programs") {
+        return copyInitrdPrograms(commandArgs, input);
     }
 
     const auto commandIt = allowedCommands().find(command);

@@ -54,11 +54,6 @@ BatchprocessingCppPlan BatchprocessingOrchestrationQtPlanOracle::planOrchestrati
         return p;
     }
 
-    plan_debug(p, "Free space: <computed>");
-    if (!settings.monthly && !settings.overrideSize) {
-        plan_debug(p, "Unused space: <computed>");
-    }
-
     if (!env.checkSnapshotDirOk || !env.checkTempDirOk) {
         plan_work(p, "cleanUp", WorkCppPlan{});
         plan_abort(p, "snapshot/temp dir check failed");

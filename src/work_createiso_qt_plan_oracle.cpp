@@ -53,6 +53,14 @@ static QStringList splitShellWords(const QString &text)
     return out;
 }
 
+static QString squashfsSessionExcludeArg(QString path)
+{
+    if (!path.isEmpty() && path.front() == QLatin1Char('/')) {
+        path.remove(0, 1);
+    }
+    return path;
+}
+
 static void plan_message(WorkCppPlan &p, const std::string &s)
 {
     WorkCppPlanStep st;
@@ -125,7 +133,9 @@ WorkCppPlan WorkCreateIsoQtPlanOracle::planCreateIso(const SettingsFields &setti
     const QStringList sessionExcludes = splitShellWords(settings.sessionExcludes);
     if (!sessionExcludes.isEmpty()) {
         squashfsArgs << QStringLiteral("-e");
-        squashfsArgs += sessionExcludes;
+        for (QString exclude : sessionExcludes) {
+            squashfsArgs << squashfsSessionExcludeArg(exclude);
+        }
     }
 
     const QString wrapperCommand = env.useUnbuffer ? QStringLiteral("unbuffer") : QStringLiteral("stdbuf");

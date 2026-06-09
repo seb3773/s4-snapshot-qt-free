@@ -25,6 +25,7 @@ public:
 
     [[nodiscard]] static EmbeddedPayloadView liveFilesPayload();
     [[nodiscard]] static EmbeddedPayloadView isoTemplatesPayload();
+    [[nodiscard]] static EmbeddedPayloadView runtimeScriptsPayload();
 
     [[nodiscard]] static Result decompressPayload(const EmbeddedPayloadView &payload,
                                                   std::vector<std::uint8_t> &out);
@@ -37,6 +38,7 @@ public:
 
     [[nodiscard]] static Result extractLiveFiles(const std::string &dest_root);
     [[nodiscard]] static Result extractIsoTemplates(const std::string &dest_root);
+    [[nodiscard]] static Result extractRuntimeScripts(const std::string &dest_root);
 
     [[nodiscard]] static Result extractIsoTemplateTree(const std::string &dest_root);
     [[nodiscard]] static Result extractTemplateInitrd(const std::string &dest_root);

@@ -33,7 +33,7 @@ public:
                                                            bool isGuiApp,
                                                            const std::string &appName,
                                                            const std::string &organizationName,
-                                                           const std::string &systemConfigPath,
+                                                           const std::string &defaultsConfigPath,
                                                            const std::string &userConfigBaseDir);
 
     [[nodiscard]] static SettingsCpp build(const CommandLineParserStd &argParser,

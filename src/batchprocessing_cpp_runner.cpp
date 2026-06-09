@@ -5,6 +5,7 @@
 
 #include "batchprocessing_cpp_planner.h"
 #include "embedded/embedded_assets_runtime.h"
+#include "embedded/embedded_helper_runtime.h"
 #include "dir_cpp.h"
 #include "file_cpp.h"
 #include "filesystemutils_cpp.h"
@@ -16,6 +17,9 @@
 #include "settings_tempdir_cpp.h"
 #include "settings_snapshotdir_cpp.h"
 #include "settings_debianver_cpp.h"
+#include "settings_space_cpp.h"
+#include "string_cpp.h"
+#include "work_cpp_planner.h"
 
 namespace {
 
@@ -23,6 +27,35 @@ static void cb_debug(const BatchprocessingCppRunner::Callbacks &cb, const std::s
 {
     if (cb.debug) {
         cb.debug(text);
+    }
+}
+
+static std::string snapshot_volume_path_like_qt(const std::string &snapshotDir)
+{
+    if (StringCpp::endsWithLikeQStringUtf8(snapshotDir, "/snapshot")) {
+        return StringCpp::removeLikeQStringUtf8(snapshotDir, static_cast<int>(snapshotDir.size()) - 9, 9);
+    }
+    if (StringCpp::endsWithLikeQStringUtf8(snapshotDir, "/snapshot\r\n")) {
+        return StringCpp::removeLikeQStringUtf8(snapshotDir, static_cast<int>(snapshotDir.size()) - 11, 11) + "\r\n";
+    }
+    if (StringCpp::endsWithLikeQStringUtf8(snapshotDir, "/snapshot\n")) {
+        return StringCpp::removeLikeQStringUtf8(snapshotDir, static_cast<int>(snapshotDir.size()) - 10, 10) + "\n";
+    }
+    return snapshotDir;
+}
+
+static void emit_space_diagnostics_like_qt(SettingsCpp &settings, const BatchprocessingCppRunner::Callbacks &cb)
+{
+    SettingsSpaceCpp::Callbacks scb;
+    scb.debug = cb.debug;
+    scb.critical = cb.critical;
+
+    const std::string path = snapshot_volume_path_like_qt(settings.snapshotDir);
+    const std::string freeGiB = SettingsSpaceCpp::getFreeSpaceStringsLikeSettingsQt(settings, path, scb);
+    cb_debug(cb, std::string("Free space: ") + freeGiB);
+
+    if (!settings.monthly && !settings.overrideSize) {
+        cb_debug(cb, std::string("Unused space:") + SettingsSpaceCpp::getUsedSpaceLikeSettingsQt(settings));
     }
 }
 
@@ -38,11 +71,49 @@ static WorkCppExecutor::Callbacks make_work_callbacks(const BatchprocessingCppRu
     return wcb;
 }
 
-static bool abort_if_signal_stop(BatchprocessingCppRunner::Result &out)
+static WorkCppPlanner::CleanupEnv make_cleanup_env(const SettingsCpp &settings, const std::string &applicationName)
+{
+    WorkCppPlanner::CleanupEnv env;
+    env.started = true;
+    env.done = false;
+    env.cleanupConfExists = FileCpp::exists("/tmp/installed-to-live/cleanup.conf");
+    const std::string overlayBase = std::string("/run/") + applicationName + "/bind-root-overlay";
+    env.bindRootOverlayBaseNonEmpty = DirCpp::exists(overlayBase);
+    env.applicationName = applicationName;
+    env.elevateTool = CommandRunner::elevationTool();
+    env.snapshotDir = settings.snapshotDir;
+    env.snapshotName = settings.snapshotName;
+    env.shutdownRequested = settings.shutdown;
+    return env;
+}
+
+static void run_interrupt_cleanup(SettingsCpp &settings,
+                                  const std::string &applicationName,
+                                  const BatchprocessingCppRunner::Callbacks &cb,
+                                  const BatchprocessingCppRunner::Dependencies &deps)
+{
+    (void)CommandRunner::procAsRoot("kill_mksquashfs", {}, std::string(), CommandRunner::QuietMode::Yes);
+
+    if (!deps.runWork) {
+        return;
+    }
+
+    const WorkCppPlanner::CleanupEnv cleanupEnv = make_cleanup_env(settings, applicationName);
+    const WorkCppPlan cleanupPlan = WorkCppPlanner::planCleanup(settings, cleanupEnv);
+    const WorkCppExecutor::Callbacks wcb = make_work_callbacks(cb, deps);
+    (void)deps.runWork(cleanupPlan, wcb);
+}
+
+static bool abort_if_signal_stop(BatchprocessingCppRunner::Result &out,
+                                 SettingsCpp &settings,
+                                 const std::string &applicationName,
+                                 const BatchprocessingCppRunner::Callbacks &cb,
+                                 const BatchprocessingCppRunner::Dependencies &deps)
 {
     if (!EmbeddedAssetsRuntime::signalStopRequested()) {
         return false;
     }
+    run_interrupt_cleanup(settings, applicationName, cb, deps);
     (void)EmbeddedAssetsRuntime::handleSignalStopIfRequested();
     out.aborted = true;
     out.abortReason = "Operation interrupted";
@@ -65,7 +136,7 @@ static BatchprocessingCppRunner::Result run_plan_with_runtime_space_check(const 
     BatchprocessingCppRunner::Result out;
 
     for (const BatchprocessingCppPlanStep &st : plan.steps) {
-        if (abort_if_signal_stop(out)) {
+        if (abort_if_signal_stop(out, settings, applicationName, cb, deps)) {
             return out;
         }
 
@@ -90,11 +161,7 @@ static BatchprocessingCppRunner::Result run_plan_with_runtime_space_check(const 
                 // This was missing in the C++ backend port, causing 0.00GiB to be reported
                 // In the original Qt code, getFreeSpaceStrings() is called before checkEnoughSpace()
                 // which initializes freeSpace. We need to do the same here.
-                std::string path = settings.snapshotDir;
-                // Remove "/snapshot" suffix if present (matching Qt logic)
-                if (path.size() >= 9 && path.substr(path.size() - 9) == "/snapshot") {
-                    path = path.substr(0, path.size() - 9);
-                }
+                const std::string path = snapshot_volume_path_like_qt(settings.snapshotDir);
                 settings.freeSpace = FileSystemUtilsCpp::getFreeSpaceKiB(path);
                 cb_debug(cb, std::string("DEBUG: Initialized freeSpace = ") + std::to_string(settings.freeSpace) + " KiB");
                 
@@ -162,6 +229,10 @@ static BatchprocessingCppRunner::Result run_plan_with_runtime_space_check(const 
             if (wr.aborted) {
                 out.aborted = true;
                 out.abortReason = wr.abortReason;
+                if (EmbeddedAssetsRuntime::signalStopRequested()) {
+                    run_interrupt_cleanup(settings, applicationName, cb, deps);
+                    out.abortReason = "Operation interrupted";
+                }
                 return out;
             }
             continue;
@@ -291,14 +362,17 @@ static int get_debian_ver_num_like_settings_qt()
 } // namespace
 
 BatchprocessingCppRunner::Result BatchprocessingCppRunner::run(const BatchprocessingCppPlan &plan,
-                                                             const SettingsCpp & /*settings*/,
+                                                             const SettingsCpp &settings,
                                                              const Callbacks &cb,
                                                              const Dependencies &deps)
 {
     Result out;
+    SettingsCpp settingsLocal = settings;
+    const std::string applicationName = deps.applicationName.empty() ? std::string("s4-snapshot")
+                                                                     : deps.applicationName;
 
     for (const BatchprocessingCppPlanStep &st : plan.steps) {
-        if (abort_if_signal_stop(out)) {
+        if (abort_if_signal_stop(out, settingsLocal, applicationName, cb, deps)) {
             return out;
         }
 
@@ -330,6 +404,10 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::run(const Batchproces
             if (wr.aborted) {
                 out.aborted = true;
                 out.abortReason = wr.abortReason;
+                if (EmbeddedAssetsRuntime::signalStopRequested()) {
+                    run_interrupt_cleanup(settingsLocal, applicationName, cb, deps);
+                    out.abortReason = "Operation interrupted";
+                }
                 return out;
             }
             continue;
@@ -365,6 +443,8 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::runFromSettings(Setti
         return out;
     }
 
+    emit_space_diagnostics_like_qt(out.settings, cb);
+
     // Snapshot dir / temp dir checks have side-effects and must run before planning.
     env.checkSnapshotDirOk = settings_check_snapshot_dir_like_qt(out.settings, cb);
 
@@ -386,6 +466,15 @@ BatchprocessingCppRunner::Result BatchprocessingCppRunner::runFromSettings(Setti
         if (!prep.ok) {
             out.aborted = true;
             out.abortReason = prep.error;
+            return out;
+        }
+        // Keep the helper on an exec-capable path (XDG_RUNTIME_DIR or /tmp). Work dirs on
+        // external/media mounts are often noexec; sudo would fail with exit 126 otherwise.
+        const EmbeddedHelperRuntime::Result helper = EmbeddedHelperRuntime::ensureHelperAvailable();
+        if (!helper.ok) {
+            out.aborted = true;
+            out.abortReason = helper.error;
+            cb_critical(cb, helper.error);
             return out;
         }
     }

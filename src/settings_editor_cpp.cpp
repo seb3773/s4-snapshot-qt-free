@@ -144,7 +144,10 @@ std::string SettingsEditorCpp::getEditorLikeSettingsQt(const std::string &guiEdi
     }
 
     if (isCliEditor) {
-        return std::string("x-terminal-emulator -e ") + elevate + " " + editor;
+        return std::string("x-terminal-emulator -e ") + (isRoot ? elevate + " " : std::string()) + editor;
+    }
+    if (!isRoot) {
+        return editor;
     }
 
     return elevate + " env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY " + editor;

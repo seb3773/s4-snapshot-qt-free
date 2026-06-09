@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the two embedded asset payloads (live-files + iso-templates).
+# Build embedded asset payloads (live-files + iso-templates + runtime scripts).
 # Step 1 of the monolithic binary asset pipeline.
 
 set -euo pipefail
@@ -16,6 +16,7 @@ LIVE_FILES_SRC="$ROOT_DIR/data/live-files"
 ISO_TEMPLATES_SRC="$ROOT_DIR/data/iso-templates"
 ISO_TEMPLATE_DIR="$ISO_TEMPLATES_SRC/iso-template"
 INITRD_TEMPLATE_DIR="$ISO_TEMPLATES_SRC/template-initrd"
+RUNTIME_SCRIPTS_SRC="$ROOT_DIR/scripts"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -59,7 +60,7 @@ prepare_staging() {
     echo "Preparing staging directories..."
 
     rm -rf "$STAGING_DIR"
-    mkdir -p "$STAGING_DIR/iso-templates"
+    mkdir -p "$STAGING_DIR/iso-templates" "$STAGING_DIR/runtime-scripts"
 
     if [ ! -d "$LIVE_FILES_SRC/files" ] || [ ! -d "$LIVE_FILES_SRC/general-files" ]; then
         echo "ERROR: invalid live-files source at $LIVE_FILES_SRC" >&2
@@ -74,10 +75,15 @@ prepare_staging() {
     cp -a "$LIVE_FILES_SRC" "$STAGING_DIR/live-files"
     cp -a "$ISO_TEMPLATE_DIR" "$STAGING_DIR/iso-templates/iso-template"
     cp -a "$INITRD_TEMPLATE_DIR" "$STAGING_DIR/iso-templates/template-initrd"
+    cp -a "$RUNTIME_SCRIPTS_SRC/snapshot-bootparameter.sh" "$STAGING_DIR/runtime-scripts/"
+    cp -a "$RUNTIME_SCRIPTS_SRC/configure_debian_calamares.sh" "$STAGING_DIR/runtime-scripts/"
+    cp -a "$RUNTIME_SCRIPTS_SRC/copy-initrd-modules" "$STAGING_DIR/runtime-scripts/"
+    cp -a "$RUNTIME_SCRIPTS_SRC/copy-initrd-programs" "$STAGING_DIR/runtime-scripts/"
 
     echo "  live-files:      $(du -sh "$STAGING_DIR/live-files" | awk '{print $1}')"
     echo "  iso-template:    $(du -sh "$STAGING_DIR/iso-templates/iso-template" | awk '{print $1}')"
     echo "  template-initrd: $(du -sh "$STAGING_DIR/iso-templates/template-initrd" | awk '{print $1}')"
+    echo "  runtime-scripts: $(du -sh "$STAGING_DIR/runtime-scripts" | awk '{print $1}')"
 }
 
 build_tools() {
@@ -145,6 +151,7 @@ main() {
     build_tools
     build_payload "live_files" "live-files"
     build_payload "iso_templates" "iso-templates"
+    build_payload "runtime_scripts" "runtime-scripts"
 
     echo ""
     echo "Embedded payloads ready under $GENERATED_DIR"

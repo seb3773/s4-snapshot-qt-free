@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
+#include "config_paths.h"
 #include "dir_cpp.h"
 #include "file_cpp.h"
 #include "process_runner.h"
@@ -139,6 +140,13 @@ void SettingsProcessArgsCpp::applyLikeSettingsQt(SettingsCpp &settings, const In
     if (!in.directoryArg.empty()) {
         if (FileCpp::exists(in.directoryArg)) {
             settings.snapshotDir = DirCpp::absolutePath(in.directoryArg) + "/snapshot";
+            if (!in.organizationName.empty() && !in.applicationName.empty()) {
+                S4SnapshotConfig::persistSnapshotDir(
+                    S4SnapshotConfig::userConfigBaseDirStd(),
+                    in.organizationName,
+                    in.applicationName,
+                    settings.snapshotDir);
+            }
         } else {
             warn(callbacks, std::string("Directory does not exist: ") + qt_quote(in.directoryArg));
             die_failure();

@@ -1,81 +1,16 @@
 #include "cmd_cpp.h"
 
 #include "command_runner.h"
+#include "embedded/embedded_helper_runtime.h"
 #include "logger_cpp.h"
 
 #ifdef CLI_BUILD
 #include "messagehandler_cpp.h"
 #endif
 
-#include <cstdio>
-#include <cstring>
 #include <unistd.h>
 
 namespace {
-std::string proc_self_cmdline_argv0()
-{
-    std::FILE *f = std::fopen("/proc/self/cmdline", "rb");
-    if (!f) {
-        return std::string();
-    }
-
-    std::string out;
-    char buf[256];
-    while (true) {
-        const std::size_t n = std::fread(buf, 1, sizeof(buf), f);
-        if (n == 0) {
-            break;
-        }
-        out.append(buf, buf + n);
-        const std::size_t nul = out.find('\0');
-        if (nul != std::string::npos) {
-            out.resize(nul);
-            break;
-        }
-    }
-
-    std::fclose(f);
-    return out;
-}
-
-std::string basename_qt_fileinfo_basename_semantics(const std::string &path)
-{
-    if (path.empty()) {
-        return std::string();
-    }
-
-    std::size_t end = path.size();
-    while (end > 0 && path[end - 1] == '/') {
-        --end;
-    }
-    if (end == 0) {
-        return std::string();
-    }
-
-    std::size_t slash = path.rfind('/', end - 1);
-    const std::size_t start = (slash == std::string::npos) ? 0 : (slash + 1);
-
-    const std::string fileName = path.substr(start, end - start);
-    if (fileName == "." || fileName == "..") {
-        return fileName;
-    }
-
-    const std::size_t dot = fileName.rfind('.');
-    if (dot == std::string::npos) {
-        return fileName;
-    }
-    if (dot == 0) {
-        return fileName;
-    }
-    return fileName.substr(0, dot);
-}
-
-std::string applicationNameLikeQtDefault()
-{
-    const std::string argv0 = proc_self_cmdline_argv0();
-    return basename_qt_fileinfo_basename_semantics(argv0);
-}
-
 CommandRunner::QuietMode toQuietMode(CmdCpp::QuietMode quiet)
 {
     return (quiet == CmdCpp::QuietMode::Yes) ? CommandRunner::QuietMode::Yes : CommandRunner::QuietMode::No;
@@ -84,7 +19,6 @@ CommandRunner::QuietMode toQuietMode(CmdCpp::QuietMode quiet)
 
 CmdCpp::CmdCpp()
     : elevationToolPath(CmdCpp::elevationTool())
-    , helperPath(std::string("/usr/lib/") + applicationNameLikeQtDefault() + std::string("/helper"))
 {
 }
 
@@ -164,10 +98,16 @@ bool CmdCpp::helperProc(const std::vector<std::string> &helperArgs, std::string 
         return false;
     }
 
-    const std::string program = (getuid() == 0) ? helperPath : elevationToolPath;
+    const EmbeddedHelperRuntime::Result helper = EmbeddedHelperRuntime::ensureHelperAvailable();
+    if (!helper.ok) {
+        LoggerCpp::log(LoggerCpp::Level::Warning, helper.error);
+        return false;
+    }
+
+    const std::string program = (getuid() == 0) ? helper.path : elevationToolPath;
     std::vector<std::string> programArgs = helperArgs;
     if (getuid() != 0) {
-        programArgs.insert(programArgs.begin(), helperPath);
+        programArgs.insert(programArgs.begin(), helper.path);
     }
 
     const bool ok = proc(program, programArgs, output, input, quiet, Elevation::No);

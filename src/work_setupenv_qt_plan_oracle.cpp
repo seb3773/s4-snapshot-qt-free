@@ -186,13 +186,10 @@ WorkCppPlan WorkSetupEnvQtPlanOracle::planSetupEnv(const SettingsFields &setting
                         bindRoot.toStdString()},
                        true);
 
-        plan_proc_root(p, "mountpoint", {"-q", bindRoot.toStdString()}, true);
-
         if (env.setupBindRootOverlay_bindRootIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", bindRoot.toStdString()}, true);
         }
 
-        plan_proc_root(p, "mountpoint", {"-q", lowerDir.toStdString()}, true);
         if (env.setupBindRootOverlay_lowerIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", lowerDir.toStdString()}, true);
         }

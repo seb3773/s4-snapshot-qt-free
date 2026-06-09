@@ -1,5 +1,5 @@
-mkdir -p /usr/share/excludes
-ln -fs /etc/s4-snapshot-exclude.list /usr/share/excludes/s4-snapshot-exclude.list
+mkdir -p /usr/share/s4-snapshot /usr/share/excludes
+ln -fs /usr/share/s4-snapshot/s4-snapshot-exclude.list /usr/share/excludes/s4-snapshot-exclude.list
 
 #cleanup old links
 

@@ -98,6 +98,7 @@ public:
     [[nodiscard]] QString getEditor() const;
     [[nodiscard]] QString getFilename() const;
     [[nodiscard]] QString getFreeSpaceStrings(const QString &path);
+    [[nodiscard]] QString getRequiredSnapshotSizeReport(const QString &applicationName) const;
     [[nodiscard]] QString getSnapshotSize() const;
     [[nodiscard]] QString getUsedSpace();
     [[nodiscard]] QString getXdgUserDirs(const QString &folder);
@@ -128,6 +129,7 @@ public:
     void excludeVirtualBox(bool exclude);
     void handleInitializationError(const QString &error) const;
     void loadConfig();
+    void persistSnapshotDir();
     void otherExclusions();
     void processArgs(
 #ifdef CLI_BUILD

@@ -110,6 +110,7 @@ private:
     void handleBackendMessage(const std::string& msg);
     void handleBackendLog(const std::string& log);
     bool shouldAbortBackend();
+    void requestOperationCancel();
     
     // Async execution handlers
     void startBackgroundProcessing(const SettingsCpp &cppSettings,
@@ -118,8 +119,7 @@ private:
                                    const BatchprocessingCppRunner::Dependencies &deps);
     void onBackgroundProcessingFinished();
 
-    [[nodiscard]] bool confirmStart();
-    [[noreturn]] void cleanUp();
+    [[nodiscard]] bool confirmStart(const QString &sizeReport);
     bool installPackage(const QString &package);
     void appendIsoExtension(QString &file_name) const;
     void applyExclusions();

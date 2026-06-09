@@ -23,6 +23,7 @@
 
 #include "../src/filesystemutils.h"
 #include "../src/command_runner.h"
+#include "../src/embedded/embedded_helper_runtime.h"
 #include "../src/dir_cpp.h"
 #include "../src/tempfile_cpp.h"
 #include "../src/standard_paths_cpp.h"
@@ -8125,9 +8126,6 @@ static void test_settingscppbuilder_loadconfig_oracle_vs_qsettings()
         QSettings settingsUser;
         check(settingsUser.status() == QSettings::NoError, "user QSettings must be accessible");
 
-        const QString systemSnapshotExcludes = settingsSystem.value(QStringLiteral("snapshot_excludes")).toString().trimmed();
-        const bool userConfiguredSnapshotExcludes = settingsUser.contains(QStringLiteral("snapshot_excludes"));
-
         settingsSystem.beginGroup(QStringLiteral(""));
         const QStringList systemKeys = settingsSystem.allKeys();
         settingsSystem.endGroup();
@@ -8138,11 +8136,7 @@ static void test_settingscppbuilder_loadconfig_oracle_vs_qsettings()
             }
         }
 
-        QString configuredExcludesPath = settingsUser.value(QStringLiteral("snapshot_excludes"), userExcludesPath).toString().trimmed();
-        if (!userConfiguredSnapshotExcludes || configuredExcludesPath == systemSnapshotExcludes) {
-            configuredExcludesPath = userExcludesPath;
-            settingsUser.setValue(QStringLiteral("snapshot_excludes"), configuredExcludesPath);
-        }
+        settingsUser.setValue(QStringLiteral("snapshot_excludes"), userExcludesPath);
 
         const uint maxCores = 4;
         const QVariant coresValue = settingsUser.value(QStringLiteral("cores"), maxCores);
@@ -8188,7 +8182,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_throttle_to
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     const auto write_minimal_system_config = [](const QString &path) {
@@ -8284,7 +8278,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_mksq_opt_tr
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     const auto write_minimal_system_config = [](const QString &path) {
@@ -8378,7 +8372,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_compression
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     const auto write_minimal_system_config = [](const QString &path) {
@@ -8473,7 +8467,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_workdir_tem
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     const auto write_minimal_system_config = [](const QString &path) {
@@ -8568,7 +8562,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_checksums_b
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     const auto write_minimal_system_config = [](const QString &path) {
@@ -8682,7 +8676,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_snapshot_di
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     const auto write_minimal_system_config = [](const QString &path) {
@@ -8753,7 +8747,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_cores_norma
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     const auto write_minimal_system_config = [](const QString &path) {
@@ -8860,7 +8854,7 @@ static void test_settings_loadconfig_qt_vs_settingscppbuilder_oracle_excludes_co
     const QString prevOrg = QCoreApplication::organizationName();
     const QString prevApp = QCoreApplication::applicationName();
 
-    QCoreApplication::setOrganizationName(QStringLiteral("MX-Linux"));
+    QCoreApplication::setOrganizationName(QStringLiteral("s4-snapshot"));
     QCoreApplication::setApplicationName(QStringLiteral("unit_tests"));
 
     QTemporaryDir td;
@@ -10077,6 +10071,14 @@ static void test_embedded_assets_extract_live_files_and_iso_templates_basic()
     check(initrdResult.ok, ("embedded template-initrd extract failed: " + initrdResult.error).c_str());
     check(QFileInfo::exists(initrdDir.filePath("etc/init.d/live-init")),
           "embedded template-initrd must extract etc/init.d/live-init");
+    {
+        const QFileInfo shInfo(initrdDir.filePath("bin/sh"));
+        check(shInfo.isSymLink(), "embedded template-initrd bin/sh must be a symlink");
+        check(shInfo.symLinkTarget() == QStringLiteral("busybox"),
+              "embedded template-initrd bin/sh must point to busybox");
+        check(QFileInfo(initrdDir.filePath("bin/busybox")).isExecutable(),
+              "embedded template-initrd bin/busybox must be executable");
+    }
 }
 
 static void test_i18ncli_load_kv_and_translate_basic()
@@ -10263,9 +10265,6 @@ static void test_settings_loadconfig_merge_qsettings_vs_qsettingscpp()
         QSettings settingsUser;
         check(settingsUser.status() == QSettings::NoError, "user QSettings must be accessible");
 
-        const QString systemSnapshotExcludes = settingsSystem.value(QStringLiteral("snapshot_excludes")).toString().trimmed();
-        const bool userConfiguredSnapshotExcludes = settingsUser.contains(QStringLiteral("snapshot_excludes"));
-
         settingsSystem.beginGroup(QStringLiteral(""));
         const QStringList systemKeys = settingsSystem.allKeys();
         settingsSystem.endGroup();
@@ -10276,11 +10275,7 @@ static void test_settings_loadconfig_merge_qsettings_vs_qsettingscpp()
             }
         }
 
-        QString configuredExcludesPath = settingsUser.value(QStringLiteral("snapshot_excludes"), userExcludesPath).toString().trimmed();
-        if (!userConfiguredSnapshotExcludes || configuredExcludesPath == systemSnapshotExcludes) {
-            configuredExcludesPath = userExcludesPath;
-            settingsUser.setValue(QStringLiteral("snapshot_excludes"), configuredExcludesPath);
-        }
+        settingsUser.setValue(QStringLiteral("snapshot_excludes"), userExcludesPath);
 
         const uint maxCores = 4;
         const QVariant coresValue = settingsUser.value(QStringLiteral("cores"), maxCores);
@@ -10315,22 +10310,13 @@ static void test_settings_loadconfig_merge_qsettings_vs_qsettingscpp()
             (void)QSettingsCpp::nativeGeneralSetValueString(userPrimaryPath, key, value);
         };
 
-        const QString systemSnapshotExcludes = QString::fromUtf8(
-            QSettingsCpp::iniGeneralValueString(systemPathStd, std::string("snapshot_excludes"), std::string()).c_str()).trimmed();
-        const bool userConfiguredSnapshotExcludes = userContains(std::string("snapshot_excludes"));
-
         for (const auto &it : systemKv) {
             if (!userContains(it.first)) {
                 userSet(it.first, it.second);
             }
         }
 
-        QString configuredExcludesPath = QString::fromUtf8(
-            userValue(std::string("snapshot_excludes"), userExcludesPath.toStdString()).c_str()).trimmed();
-        if (!userConfiguredSnapshotExcludes || configuredExcludesPath == systemSnapshotExcludes) {
-            configuredExcludesPath = userExcludesPath;
-            userSet(std::string("snapshot_excludes"), configuredExcludesPath.toStdString());
-        }
+        userSet(std::string("snapshot_excludes"), userExcludesPath.toStdString());
 
         const uint maxCores = 4;
         const QString coresValueStr = QString::fromUtf8(
@@ -15006,12 +14992,8 @@ static void test_work_createiso_appname_qt_vs_cpp_exact()
     check(qtAppName.toStdString() == cppAppName,
           "QCoreApplication::applicationName() must match C++ basename extraction");
     
-    // Test in path construction context (line 661 in work.cpp)
-    const QString qtHelperPath = "/usr/lib/" + qtAppName + "/helper";
-    const std::string cppHelperPath = "/usr/lib/" + cppAppName + "/helper";
-    
-    check(qtHelperPath.toStdString() == cppHelperPath,
-          "helper path construction must match between Qt and C++");
+    check(EmbeddedHelperRuntime::defaultHelperPathForWorkDir("/tmp/work") == "/tmp/work/_embedded/helper/helper",
+          "embedded helper path must live under workDir/_embedded");
     
     // Test in error message context (line 651 in work.cpp)
     const QString qtErrorMsg = QString("Could not create linuxfs file, please check /var/log/%1.log").arg(qtAppName);

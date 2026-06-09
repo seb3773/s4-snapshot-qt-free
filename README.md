@@ -56,14 +56,14 @@ Summary: S4 Snapshot creates bootable live ISO images from running Debian-based 
                          │           │
         ┌────────────────▼───┐   ┌───▼────────────────────┐
         │ Embedded assets     │   │ Privileged helper      │
-        │ workDir/_embedded/  │   │ /usr/lib/<app>/helper  │
+       │ workDir/_embedded/  │   │ embedded, then exec    │
         │ + workDir/iso-tree  │   │ exec <allowed-action>  │
         └────────────────────┘   └────────────────────────┘
 ```
 
-The helper is not a frontend. It is the privileged boundary used by frontends
-when the backend needs root-only operations such as mounts, ownership changes,
-`mksquashfs`, cleanup, or the native `installed-to-live` workflow.
+The helper is not a frontend. It is an embedded privileged boundary prepared by
+the backend when root-only operations are needed, such as mounts, ownership
+changes, `mksquashfs`, cleanup, or the native `installed-to-live` workflow.
 
 ### Plan-Execute Pattern
 
@@ -104,7 +104,9 @@ s4-snapshot-port/
 │   └── EmbeddedAssets.cmake      # CMake integration for embedded payloads
 │
 ├── scripts/
-│   └── build_embedded_payloads.sh # Builds live_files + iso_templates payloads
+│   ├── build_embedded_payloads.sh # Builds embedded payloads
+│   ├── verify_qt_free.sh          # Development/build verification helper
+│   └── runtime helper scripts     # Embedded into the binaries, not installed
 │
 ├── tools/
 │   ├── asset_pack.c             # Build-time LZ4 packer
@@ -244,11 +246,6 @@ iso-snapshot-cli --version
 s4-snapshot
 
 
-### Helper tool
-
-# privileged system helper (used internally)
-sudo /usr/lib/s4-snapshot/helper exec <allowed-command> [args...]
-
 The main CLI/GUI process should normally run as the logged-in user. Privileged
 operations are delegated to the helper only when needed.
 
@@ -262,7 +259,7 @@ The backend exposes a clean C++ API for integration:
 
 // Build settings
 SettingsCpp settings = SettingsCppBuilder::buildFromArgs(
-    args, true, "s4-snapshot", "MX-Linux"
+    args, true, "s4-snapshot", "s4-snapshot"
 );
 
 // Setup callbacks
@@ -381,22 +378,25 @@ Implemented commands include `start`, `bind=`, `empty=`, `live-files`, `general-
 
 The backend is designed to run the main application as the logged-in user and
 request administrator privileges only for the specific operations that need
-them. The Qt-free `helper` binary is the privileged boundary:
+them. The Qt-free helper remains the privileged boundary, but it is embedded in
+the application binary and extracted by the backend runtime:
 
 ```
 frontend (CLI, TUI, GUI, etc.)
     -> backend core
+        -> workDir/_embedded/helper/helper
         -> elevation tool
-            -> /usr/lib/<app>/helper exec <allowed-command> [args...]
+            -> embedded helper exec <allowed-command> [args...]
 ```
 
 The helper keeps a strict allowlist of commands and implements the native
 `installed-to-live` workflow internally. It is not a general-purpose shell.
 
-For the CLI frontend, `sudo` is the default and most portable elevation tool:
+For the CLI frontend, `sudo` is the default and most portable elevation tool.
+The concrete helper path is a backend runtime detail:
 
 ```bash
-sudo /usr/lib/iso-snapshot-cli/helper exec mount --bind / /tmp/root
+sudo /tmp/<workdir>/_embedded/helper/helper exec mount --bind / /tmp/root
 ```
 
 For graphical frontends, the backend intentionally does not mandate one
@@ -404,17 +404,19 @@ authentication mechanism. The UI author should pick the approach that fits the
 framework and platform: `sudo`, `doas`, a framework-specific password dialog, or
 another local policy mechanism. Polkit is not required by the backend.
 
-A simple Qt-style approach is to ask for the password in the GUI and feed it to
-`sudo -S` while running only the helper as root:
+A simple Qt-style approach, if an UI author implements elevation directly, is to
+ask for the password in the GUI and feed it to `sudo -S` while running only the
+backend-provided helper path as root:
 
 ```cpp
 QProcess proc;
 
+const QString helperPath = backendPreparedHelperPath();
 proc.start("sudo", {
     "-S",
     "-p",
     "",
-    "/usr/lib/s4-snapshot/helper",
+    helperPath,
     "exec",
     "mount",
     "--bind",
@@ -443,14 +445,18 @@ feed `sudo` for the helper invocation.
 
 ### Embedded runtime assets
 
-Live-files and ISO boot templates are embedded in the CLI and GUI binaries at compile time (~20 MiB LZ4-compressed payload). At runtime the backend:
+Live-files, ISO boot templates, and runtime scripts are embedded in the CLI, GUI, and helper binaries at compile time. At runtime the backend:
 
 1. Creates the normal `workDir` under the project temp prefix
 2. Extracts live-files into `workDir/_embedded/live-files/` before `setupEnv`
-3. Extracts ISO templates directly into `workDir/iso-template/` and the initrd workspace during `copyNewIso`
-4. Cleans up `workDir/_embedded/` on exit (including `SIGINT` / `SIGTERM`)
+3. Extracts runtime scripts into `workDir/_embedded/scripts/`
+4. Extracts ISO templates directly into `workDir/iso-template/` and the initrd workspace during `copyNewIso`
+5. Copies the runtime scripts into the generated initrd under `/usr/share/s4-snapshot/scripts/` when the initrd template expects them
+6. Cleans up `workDir/_embedded/` on exit (including `SIGINT` / `SIGTERM`)
 
-No `data/` tree is installed on target systems by the Debian packages. The `data/` directory in the source tree is only used as **build input** for `scripts/build_embedded_payloads.sh` (invoked automatically by CMake):
+The privileged helper also embeds the runtime script payload. For root-only script actions such as `copy-initrd-programs`, the helper extracts its own copy under `$XDG_RUNTIME_DIR/s4-snapshot/runtime-scripts/` (or `/tmp/s4-snapshot-<uid>/runtime-scripts/` when needed) and executes only the allowlisted action. The frontend never passes an arbitrary script path to be run as root.
+
+No `data/` tree or `scripts/` runtime tree is installed on target systems by the Debian packages. These source directories are only used as **build input** for `scripts/build_embedded_payloads.sh` (invoked automatically by CMake):
 
 ```
 data/
@@ -458,9 +464,15 @@ data/
 └── iso-templates/
     ├── iso-template/
     └── template-initrd/
+
+scripts/
+├── snapshot-bootparameter.sh
+├── configure_debian_calamares.sh
+├── copy-initrd-modules
+└── copy-initrd-programs
 ```
 
-Edit those trees, then rebuild (`./build_cli_qtfree.sh` or `./build_gui.sh`) to refresh the embedded payloads.
+Edit those trees or runtime scripts, then rebuild (`./build_cli_qtfree.sh` or `./build_gui.sh`) to refresh the embedded payloads.
 
 **Manual payload rebuild** (usually unnecessary):
 
@@ -535,8 +547,8 @@ sudo apt install squashfs-tools xorriso
 ### Runtime Issues
 
 **Permission denied**:
-# verify that an elevation tool can run the helper
-sudo /usr/lib/iso-snapshot-cli/helper exec true
+# verify that an elevation tool is available
+sudo -v
 
 **Insufficient space**:
 # check available space:

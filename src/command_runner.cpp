@@ -10,11 +10,21 @@
 
 #include <unistd.h>
 
+#include "embedded/embedded_helper_runtime.h"
 #include "process_runner.h"
 
 namespace {
 
 static const CommandRunner::Hooks *g_hooks = nullptr;
+static const CommandRunner::GuiElevationHooks *g_gui_elevation_hooks = nullptr;
+
+static bool sudo_auth_failed(const std::string &text)
+{
+    return text.find("incorrect password") != std::string::npos
+        || text.find("Sorry, try again") != std::string::npos
+        || text.find("authentication failure") != std::string::npos
+        || text.find("3 incorrect password attempts") != std::string::npos;
+}
 
 static std::string trim_copy(const std::string &s)
 {
@@ -34,6 +44,7 @@ static bool file_exists(const char *path)
     return ::access(path, F_OK) == 0;
 }
 
+#ifndef CLI_BUILD
 static std::string readlink_string(const char *path)
 {
     std::string out;
@@ -45,6 +56,7 @@ static std::string readlink_string(const char *path)
     out.resize(static_cast<size_t>(n));
     return out;
 }
+#endif
 
 static std::string getenv_string(const char *name)
 {
@@ -61,11 +73,33 @@ static std::string merge_for_display(const std::string &stdoutText, const std::s
     return merged;
 }
 
+static CommandRunner::Result result_from_process(const ProcessRunner::Result &r)
+{
+    CommandRunner::Result out;
+    out.started = r.started;
+    out.exitCode = r.exitCode;
+    out.normalExit = (r.exitStatus == ProcessRunner::ExitStatus::NormalExit);
+    out.stdoutText = r.stdoutText;
+    out.stderrText = r.stderrText;
+    out.mergedText = merge_for_display(out.stdoutText, out.stderrText);
+    return out;
+}
+
 } // namespace
 
 void CommandRunner::setHooksForTests(const Hooks *hooks)
 {
     g_hooks = hooks;
+}
+
+void CommandRunner::setGuiElevationHooks(const GuiElevationHooks *hooks)
+{
+    g_gui_elevation_hooks = hooks;
+}
+
+void CommandRunner::clearGuiElevationHooks()
+{
+    g_gui_elevation_hooks = nullptr;
 }
 
 std::string CommandRunner::elevationTool()
@@ -195,19 +229,24 @@ CommandRunner::Result CommandRunner::helperProc(const std::vector<std::string> &
     Result out;
     (void)quiet;
 
+    const EmbeddedHelperRuntime::Result helper = EmbeddedHelperRuntime::ensureHelperAvailable();
+    if (!helper.ok) {
+        out.started = false;
+        out.exitCode = 1;
+        out.normalExit = true;
+        out.stderrText = helper.error + "\n";
+        out.mergedText = out.stderrText;
+        return out;
+    }
+    const std::string helperPath = helper.path;
+
+    if (::getuid() == 0) {
+        const ProcessRunner::Result r = ProcessRunner::run(helperPath, helperArgs, stdinText, -1);
+        return result_from_process(r);
+    }
+
     const std::string elevationToolPath = CommandRunner::elevationTool();
-    const std::string appName = []() {
-        std::string exePath = readlink_string("/proc/self/exe");
-        if (exePath.empty()) {
-            return std::string("s4-snapshot");
-        }
-        const size_t pos = exePath.find_last_of('/');
-        return (pos == std::string::npos) ? exePath : exePath.substr(pos + 1);
-    }();
-
-    const std::string helperPath = std::string("/usr/lib/") + appName + "/helper";
-
-    if (::getuid() != 0 && elevationToolPath.empty()) {
+    if (elevationToolPath.empty()) {
         out.started = false;
         out.exitCode = 1;
         out.normalExit = true;
@@ -216,19 +255,59 @@ CommandRunner::Result CommandRunner::helperProc(const std::vector<std::string> &
         return out;
     }
 
-    const std::string program = (::getuid() == 0) ? helperPath : elevationToolPath;
-    std::vector<std::string> programArgs = helperArgs;
-    if (::getuid() != 0) {
-        programArgs.insert(programArgs.begin(), helperPath);
+    const bool useGuiElevation = !CommandRunner::isCliMode()
+        && g_gui_elevation_hooks != nullptr
+        && g_gui_elevation_hooks->askPassword != nullptr
+        && elevationToolPath.find("sudo") != std::string::npos;
+
+    if (useGuiElevation) {
+        std::vector<std::string> sudoArgs {"-S", "-p", "", helperPath};
+        sudoArgs.insert(sudoArgs.end(), helperArgs.begin(), helperArgs.end());
+
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            const std::string password = g_gui_elevation_hooks->askPassword();
+            if (password.empty()) {
+                out.started = false;
+                out.exitCode = 1;
+                out.normalExit = true;
+                out.stderrText = "Administrator password required.\n";
+                out.mergedText = out.stderrText;
+                return out;
+            }
+
+            std::string sudoStdin = password;
+            sudoStdin.push_back('\n');
+            sudoStdin += stdinText;
+
+            const ProcessRunner::Result r = ProcessRunner::run(elevationToolPath, sudoArgs, sudoStdin, -1);
+            out = result_from_process(r);
+            if (!sudo_auth_failed(out.mergedText)) {
+                static constexpr int EXIT_CODE_COMMAND_NOT_FOUND = 127;
+                static constexpr int EXIT_CODE_PERMISSION_DENIED = 126;
+                if (out.exitCode == EXIT_CODE_COMMAND_NOT_FOUND || out.exitCode == EXIT_CODE_PERMISSION_DENIED) {
+                    handleElevationError();
+                }
+                return out;
+            }
+
+            if (g_gui_elevation_hooks->invalidateCachedPassword) {
+                g_gui_elevation_hooks->invalidateCachedPassword();
+            }
+        }
+
+        out.started = false;
+        out.exitCode = 1;
+        out.normalExit = true;
+        out.stderrText = "Incorrect administrator password.\n";
+        out.mergedText = out.stderrText;
+        return out;
     }
 
-    const ProcessRunner::Result r = ProcessRunner::run(program, programArgs, stdinText, -1);
-    out.started = r.started;
-    out.exitCode = r.exitCode;
-    out.normalExit = (r.exitStatus == ProcessRunner::ExitStatus::NormalExit);
-    out.stdoutText = r.stdoutText;
-    out.stderrText = r.stderrText;
-    out.mergedText = merge_for_display(out.stdoutText, out.stderrText);
+    std::vector<std::string> programArgs = helperArgs;
+    programArgs.insert(programArgs.begin(), helperPath);
+
+    const ProcessRunner::Result r = ProcessRunner::run(elevationToolPath, programArgs, stdinText, -1);
+    out = result_from_process(r);
 
     static constexpr int EXIT_CODE_COMMAND_NOT_FOUND = 127;
     static constexpr int EXIT_CODE_PERMISSION_DENIED = 126;
@@ -256,5 +335,10 @@ void CommandRunner::handleElevationError()
     std::fprintf(stderr,
                  "This operation requires administrator privileges. Please restart the application and enter your password when prompted.\n");
     std::fflush(stderr);
+#ifndef CLI_BUILD
+    if (!isCliMode()) {
+        return;
+    }
+#endif
     std::exit(EXIT_FAILURE);
 }

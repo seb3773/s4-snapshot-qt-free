@@ -384,23 +384,21 @@ bool Work::checkInstalled(const QString &package)
 
 void Work::cleanUp()
 {
-    const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-    const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " chown_conf", CommandRunner::QuietMode::Yes);
     if (!started) {
         initrd_dir.remove();
         cleanupBindRootOverlay();
         exit(EXIT_SUCCESS);
     }
+
+    (void)procAsRoot("chown_conf", {}, nullptr, CommandRunner::QuietMode::Yes);
     notifyMessage(QObject::tr("Cleaning..."));
     (void)StdioCpp::write(stdout, "\033[?25h");
     (void)StdioCpp::flush(stdout);
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " kill_mksquashfs", CommandRunner::QuietMode::Yes);
+    (void)procAsRoot("kill_mksquashfs", {}, nullptr, CommandRunner::QuietMode::Yes);
     (void)ProcessRunner::execute("sync", {});
     (void)DirCpp::setCurrent("/");
     if (FileCpp::exists("/tmp/installed-to-live/cleanup.conf")) {
-        const QString elevateTool2 = QString::fromStdString(CommandRunner::elevationTool());
-        (void)runCommandLine(elevateTool2 + " " + snapshotLib + " cleanup");
+        (void)procAsRoot("cleanup", {}, nullptr, CommandRunner::QuietMode::No);
     }
     cleanupBindRootOverlay();
     (void)FileCpp::remove("/var/lib/mxdebian/.mxsnapshot_accounts_reset.stp");
@@ -408,7 +406,7 @@ void Work::cleanUp()
     settings->tmpdir.reset();
     if (done) {
         notifyMessage(QObject::tr("Done"));
-        (void)runCommandLine(elevateTool + " " + snapshotLib + " copy_log", CommandRunner::QuietMode::Yes);
+        (void)procAsRoot("copy_log", {}, nullptr, CommandRunner::QuietMode::Yes);
         if (settings->shutdown) {
             (void)FileCpp::copy(("/tmp/" + QCoreApplication::applicationName() + ".log").toStdString(),
                                 (settings->snapshotDir + "/" + settings->snapshotName + ".log").toStdString());
@@ -416,11 +414,11 @@ void Work::cleanUp()
             (void)ProcessRunner::execute("shutdown", {"-h", "now"}, 0);
         }
         exit(EXIT_SUCCESS);
-    } else {
-        notifyMessage(QObject::tr("Interrupted or failed to complete"));
-        (void)runCommandLine(elevateTool + " " + snapshotLib + " copy_log", CommandRunner::QuietMode::Yes);
-        exit(EXIT_FAILURE);
     }
+
+    notifyMessage(QObject::tr("Interrupted or failed to complete"));
+    (void)procAsRoot("copy_log", {}, nullptr, CommandRunner::QuietMode::Yes);
+    exit(EXIT_FAILURE);
 }
 
 // Check if we can put work_dir on another partition with enough space, move work_dir there and setupEnv again
@@ -527,10 +525,7 @@ void Work::cleanupBindRootOverlay()
         bindRootPath = "/.bind-root";
         return;
     }
-    const QString snapshotLib = "/usr/lib/" + QCoreApplication::applicationName() + "/snapshot-lib";
-    const QString elevateTool = QString::fromStdString(CommandRunner::elevationTool());
-    (void)runCommandLine(elevateTool + " " + snapshotLib + " cleanup_overlay " + QCoreApplication::applicationName(),
-                         CommandRunner::QuietMode::Yes);
+    (void)procAsRoot("cleanup_overlay", {QCoreApplication::applicationName()}, nullptr, CommandRunner::QuietMode::Yes);
     bindRootOverlayActive = false;
     bindRootOverlayBase.clear();
     bindRootPath = "/.bind-root";
@@ -1306,21 +1301,9 @@ quint64 Work::getRequiredSpace()
         root_size = static_cast<quint64>(WorkCppUtils::parseDuKilobytes(
             getOutAsRoot("du", {"-sx", "-P", sizeRoot}, CommandRunner::QuietMode::Yes), &ok));
     }
-    if (!settings->live) {
-        const quint64 rootTotal = static_cast<quint64>(FileSystemUtilsCpp::bytesTotal(std::string("/")));
-        const quint64 rootFree = static_cast<quint64>(FileSystemUtilsCpp::bytesFree(std::string("/")));
-        ok = (rootTotal != 0);
-        if (ok) {
-            root_size = (rootTotal - rootFree) / 1024;
-            if (includeHomeDevice) {
-                const quint64 homeTotal = static_cast<quint64>(FileSystemUtilsCpp::bytesTotal(std::string("/home")));
-                const quint64 homeFree = static_cast<quint64>(FileSystemUtilsCpp::bytesFree(std::string("/home")));
-                ok = (homeTotal != 0);
-                if (ok) {
-                    root_size += (homeTotal - homeFree) / 1024;
-                }
-            }
-        }
+    if (!settings->live && includeHomeDevice) {
+        root_size += static_cast<quint64>(WorkCppUtils::parseDuKilobytes(
+            getOutAsRoot("du", {"-sx", "-P", "/home"}, CommandRunner::QuietMode::Yes), &ok));
     }
     constexpr double kibToMib = 1024.0;
     if (!ok) {

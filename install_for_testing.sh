@@ -20,7 +20,7 @@ if [ ! -f "build-make/iso-snapshot-cli" ]; then
 fi
 
 # Check that binaries are compiled
-if [ ! -f "build-make/iso-snapshot-cli" ] || [ ! -f "build-make/helper" ]; then
+if [ ! -f "build-make/iso-snapshot-cli" ]; then
     echo -e "${RED}Error: Binaries not found in build-make/${NC}"
     echo "Run first: cd build-make && make"
     exit 1
@@ -38,21 +38,8 @@ if [ -f "/usr/bin/iso-snapshot-cli" ]; then
     echo -e "${GREEN}✓ Backed up: /usr/bin/iso-snapshot-cli${NC}"
 fi
 
-if [ -d "/usr/lib/iso-snapshot-cli" ]; then
-    sudo cp -rv /usr/lib/iso-snapshot-cli "$BACKUP_DIR/"
-    echo -e "${GREEN}✓ Backed up: /usr/lib/iso-snapshot-cli/${NC}"
-fi
-
 echo ""
 echo -e "${YELLOW}2. Installing new binaries...${NC}"
-
-# Create lib directory if needed
-sudo mkdir -p /usr/lib/iso-snapshot-cli
-
-# Install helper
-sudo cp -v build-make/helper /usr/lib/iso-snapshot-cli/helper
-sudo chmod 755 /usr/lib/iso-snapshot-cli/helper
-echo -e "${GREEN}✓ Installed: /usr/lib/iso-snapshot-cli/helper${NC}"
 
 # Install iso-snapshot-cli
 sudo cp -v build-make/iso-snapshot-cli /usr/bin/iso-snapshot-cli

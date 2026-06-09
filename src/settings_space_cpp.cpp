@@ -54,6 +54,12 @@ static std::string format_double_fixed_2_gib(double bytes)
     return format_double_fixed_2(bytes / factor) + "GiB";
 }
 
+static std::string format_kib_as_mib(std::uint64_t kib)
+{
+    constexpr double kibToMib = 1024.0;
+    return format_double_fixed_2(static_cast<double>(kib) / kibToMib) + "MiB";
+}
+
 static std::uint64_t get_live_root_space_like_settings_qt()
 {
     SettingsLiveRootSpaceCpp::Callbacks cb;
@@ -170,4 +176,28 @@ std::string SettingsSpaceCpp::getFreeSpaceStringsLikeSettingsQt(SettingsCpp &set
                  + std::to_string(snapCount) + " snapshots are taking up " + snapSize + " of disk space.\n\n");
 
     return out;
+}
+
+std::string SettingsSpaceCpp::formatRequiredSpaceEstimateDebugLikeSettingsQt(
+    const WorkSpaceCpp::RequiredSpaceEstimate &estimate,
+    const std::uint64_t freeSpaceKiB)
+{
+    std::string out;
+    out += "SIZE         " + format_kib_as_mib(estimate.rootKiB) + "\n";
+    out += "SIZE EXCLUDES " + format_kib_as_mib(estimate.excludesKiB) + "\n";
+    out += "COMPRESSION  " + std::to_string(estimate.compressionPercent) + "\n";
+    out += "SIZE NEEDED  " + format_kib_as_mib(estimate.requiredKiB) + "\n";
+    out += "SIZE FREE    " + format_kib_as_mib(freeSpaceKiB) + "\n";
+    return out;
+}
+
+WorkSpaceCpp::RequiredSpaceEstimate SettingsSpaceCpp::getRequiredSpaceEstimateLikeSettingsQt(
+    const SettingsCpp &settings,
+    const std::string &applicationName,
+    const Callbacks &cb)
+{
+    WorkSpaceCpp::Callbacks wcb;
+    wcb.message = [&](const std::string &text) { cb_debug(cb, text); };
+    wcb.warning = [&](const std::string &text) { cb_critical(cb, text); };
+    return WorkSpaceCpp::getRequiredSpaceEstimateLikeQt(settings, applicationName, wcb);
 }

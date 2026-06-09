@@ -9,6 +9,7 @@
 #include "file_cpp.h"
 #include "command_runner.h"
 #include "process_runner.h"
+#include "string_cpp.h"
 #include "work_cpp_utils.h"
 #ifdef UNIT_TESTS
 #include "tempdir.h"
@@ -228,6 +229,14 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
                                         r.abortReason = std::string("embedded template-initrd extraction failed: ") + extract.error;
                                         return r;
                                     }
+                                    const EmbeddedAssets::Result scriptsExtract = EmbeddedAssets::extractRuntimeScripts(
+                                        EmbeddedAssetsRuntime::initrdScriptsDir(dest));
+                                    if (!scriptsExtract.ok) {
+                                        r.aborted = true;
+                                        r.abortReason = std::string("embedded initrd scripts extraction failed: ")
+                                            + scriptsExtract.error;
+                                        return r;
+                                    }
                                 } else {
                                     lastRunCommandLineSuccess = CommandRunner::run(c.command,
                                                                                    c.quietYes ? CommandRunner::QuietMode::Yes
@@ -248,6 +257,20 @@ WorkCppExecutor::Result WorkCppExecutor::run(const WorkCppPlan &plan, const Call
             lastProcAsRootResult = CommandRunner::procAsRoot(c.program, c.args, std::string(),
                                                              c.quietYes ? CommandRunner::QuietMode::Yes
                                                                         : CommandRunner::QuietMode::No);
+            if (!(lastProcAsRootResult.started && lastProcAsRootResult.normalExit
+                  && lastProcAsRootResult.exitCode == 0)) {
+                if (EmbeddedAssetsRuntime::signalStopRequested()) {
+                    r.aborted = true;
+                    r.abortReason = "Operation interrupted";
+                    return r;
+                }
+                r.aborted = true;
+                const std::string detail = StringCpp::trimmedLikeQStringUtf8(lastProcAsRootResult.mergedText);
+                r.abortReason = detail.empty()
+                    ? (std::string("Privileged operation failed: ") + c.program)
+                    : detail;
+                return r;
+            }
             continue;
         }
 

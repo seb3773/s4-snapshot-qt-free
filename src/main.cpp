@@ -30,6 +30,7 @@
 #include <QStringList>
 #include <QTimer>
 #include "command_runner.h"
+#include "config_paths.h"
 #include "process_runner.h"
 
 #include <csignal>
@@ -172,7 +173,7 @@ int main(int argc, char *argv[])
 
     QCoreApplication::setApplicationVersion(VERSION);
     QCoreApplication::setApplicationName(QString::fromStdString(FileCpp::baseName(std::string(argv[0] ? argv[0] : ""))));
-    QCoreApplication::setOrganizationName("MX-Linux");
+    QCoreApplication::setOrganizationName(S4SnapshotConfig::kOrganizationName);
 
 #ifdef CLI_BUILD
     CommandLineParserStd parser;

@@ -29,6 +29,38 @@ static std::string trim_ascii(const std::string &s)
     return s.substr(b, e - b);
 }
 
+static std::string kernel_version_like_qt(const std::string &kernel)
+{
+    if (kernel.rfind("/boot/vmlinuz-", 0) == 0) {
+        return kernel.substr(std::string("/boot/vmlinuz-").size());
+    }
+    if (kernel.rfind("vmlinuz-", 0) == 0) {
+        return kernel.substr(std::string("vmlinuz-").size());
+    }
+    return kernel;
+}
+
+static std::string vmlinuz_image_path_like_qt(const std::string &kernel)
+{
+    if (kernel.rfind("/boot/vmlinuz-", 0) == 0) {
+        return kernel;
+    }
+    if (kernel.rfind("vmlinuz-", 0) == 0) {
+        return std::string("/boot/") + kernel;
+    }
+    return std::string("/boot/vmlinuz-") + kernel;
+}
+
+static std::string squashfs_session_exclude_arg(const std::string &path)
+{
+    // mksquashfs rejects /, ./ and ../ prefixed -e patterns when -wildcards is set.
+    // Match SettingsExclusionsCpp::add_remove_exclusion_like_settings_qt().
+    if (!path.empty() && path[0] == '/') {
+        return path.substr(1);
+    }
+    return path;
+}
+
 static void plan_message(WorkCppPlan &p, const std::string &s)
 {
     WorkCppPlanStep st;
@@ -283,8 +315,8 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
     const std::vector<std::string> sessionExcludes = splitShellWordsLikeQt(settings.sessionExcludes);
     if (!sessionExcludes.empty()) {
         squashfsArgs.push_back("-e");
-        for (const std::string &a : sessionExcludes) {
-            squashfsArgs.push_back(a);
+        for (std::string a : sessionExcludes) {
+            squashfsArgs.push_back(squashfs_session_exclude_arg(a));
         }
     }
 
@@ -298,6 +330,12 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
 
     plan_message(p, "Squashing filesystem...");
     plan_proc_root(p, wrapperCommand, wrapperArgs, false);
+    plan_run_cmd(p,
+                 std::string("test -s \"") + settings.workDir + "/iso-template/antiX/linuxfs\"",
+                 false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not create linuxfs file, please check /var/log/s4-snapshot.log",
+                 false);
 
     // Side-effect derived from mksquashfs output (unknown at plan time)
     plan_run_cmd(p,
@@ -308,6 +346,9 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
     // --- move linuxfs to iso-2
     plan_mkpath(p, "iso-2/antiX");
     plan_run_cmd(p, "mv iso-template/antiX/linuxfs* iso-2/antiX", false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not move linuxfs into iso-2.",
+                 false);
 
     // --- checksum linuxfs
     plan_message(p, "Calculating checksum...");
@@ -346,6 +387,9 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
         plan_message(p, "Making hybrid iso");
         plan_run_cmd(p,
                      std::string("isohybrid --uefi \"") + (settings.snapshotDir + "/" + filename) + "\"",
+                     false);
+        plan_run_cmd(p,
+                     "CHECK_RESULT else ERROR: Could not make the ISO bootable as a hybrid image.",
                      false);
     }
 
@@ -390,11 +434,21 @@ WorkCppPlan WorkCppPlanner::planCopyNewIso(const SettingsCpp &settings, const Co
     plan_message(p, "Copying the new-iso filesystem...");
     plan_chdir(p, settings.workDir);
 
+    const std::string kernelVersion = kernel_version_like_qt(settings.kernel);
+    if (kernelVersion.empty()) {
+        plan_abort(p, "Kernel not configured");
+        return p;
+    }
+
     plan_run_cmd(p,
                  std::string("EMBED_EXTRACT_ISO_TEMPLATE ") + settings.workDir + "/iso-template",
                  false);
+    const std::string vmlinuzSource = vmlinuz_image_path_like_qt(settings.kernel);
     plan_run_cmd(p,
-                 std::string("cp /boot/vmlinuz-") + settings.kernel + " iso-template/antiX/vmlinuz",
+                 std::string("cp \"") + vmlinuzSource + "\" iso-template/antiX/vmlinuz",
+                 false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not copy kernel (vmlinuz) into ISO template.",
                  false);
 
     // Encode settings into REPLACE_MENU_STRINGS command
@@ -449,9 +503,14 @@ WorkCppPlan WorkCppPlanner::planCopyNewIso(const SettingsCpp &settings, const Co
         }
     }
 
+    const std::string runtimeScriptsPath = settings.runtimeScriptsPath.empty()
+        ? settings.workDir + "/_embedded/scripts"
+        : settings.runtimeScriptsPath;
     plan_run_cmd(p,
-                 std::string("/usr/share/") + env.applicationName
-                     + "/scripts/copy-initrd-modules -e -t=\"" + path + "\" -k=\"" + settings.kernel + "\"",
+                 runtimeScriptsPath + "/copy-initrd-modules -e -t=\"" + path + "\" -k=\"" + kernelVersion + "\"",
+                 false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not copy kernel modules into initrd.",
                  false);
     plan_proc_root(p, "copy-initrd-programs", {"-e", "--to=" + path}, false);
     if (!env.loggedInUserName.empty()) {
@@ -462,6 +521,12 @@ WorkCppPlan WorkCppPlanner::planCopyNewIso(const SettingsCpp &settings, const Co
     plan_run_cmd(p,
                  std::string("(find . |cpio -o -H newc --owner root:root |gzip -9) >\"")
                      + (settings.workDir + "/iso-template/antiX/initrd.gz") + "\"",
+                 false);
+    plan_run_cmd(p,
+                 std::string("test -s \"") + settings.workDir + "/iso-template/antiX/initrd.gz\"",
+                 false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not build initrd.gz.",
                  false);
     plan_run_cmd(p,
                  std::string("MD5_CHECKSUM ") + settings.workDir + "/iso-template/antiX initrd.gz",
@@ -551,13 +616,12 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
 
         plan_proc_root(p, "mkdir", {"-p", overlayBase, lowerDir, upperDir, workDir, bindRoot}, true);
 
-        plan_proc_root(p, "mountpoint", {"-q", bindRoot}, true);
-
+        // mountpoint -q returns 1 when not mounted (expected). Legacy probes inline and
+        // only umounts on success; env flags come from the same probe at plan time.
         if (env.setupBindRootOverlay_bindRootIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", bindRoot}, true);
         }
 
-        plan_proc_root(p, "mountpoint", {"-q", lowerDir}, true);
         if (env.setupBindRootOverlay_lowerIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", lowerDir}, true);
         }

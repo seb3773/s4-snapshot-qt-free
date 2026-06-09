@@ -28,6 +28,21 @@ static void cb_warning(const WorkSpaceCpp::Callbacks &cb, const std::string &tex
     }
 }
 
+static std::string decode_mount_target_spaces(const std::string &encoded)
+{
+    std::string out;
+    out.reserve(encoded.size());
+    for (std::size_t i = 0; i < encoded.size();) {
+        if (i + 4 <= encoded.size() && encoded.compare(i, 4, "\\040") == 0) {
+            out.push_back(' ');
+            i += 4;
+        } else {
+            out.push_back(encoded[i++]);
+        }
+    }
+    return out;
+}
+
 static std::string format_double_fixed_2(double v)
 {
     // Match Qt QString::number(x, 'f', 2): always '.' decimal separator.
@@ -306,10 +321,11 @@ static std::vector<std::string> split_path_components_no_empty(const std::string
 
 } // namespace
 
-std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
-                                                   const std::string &applicationName,
-                                                   const Callbacks &cb)
+WorkSpaceCpp::RequiredSpaceEstimate WorkSpaceCpp::getRequiredSpaceEstimateLikeQt(const SettingsCpp &settings,
+                                                                                 const std::string &applicationName,
+                                                                                 const Callbacks &cb)
 {
+    RequiredSpaceEstimate out;
     
     std::vector<std::string> excludes;
 
@@ -412,11 +428,7 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
                 continue;
             }
 
-            std::string target = parts[1];
-            // Qt replaces "\\040" by " "
-            for (std::size_t p = target.find("\\040"); p != std::string::npos; p = target.find("\\040")) {
-                target.replace(p, 4, " ");
-            }
+            const std::string target = decode_mount_target_spaces(parts[1]);
             if (target != mountPoint) {
                 continue;
             }
@@ -657,7 +669,7 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
     if (!ok) {
         cb_warning(cb,
                    "Error: calculating size of excluded files\nIf you are sure you have enough free space rerun the program with -o/--override-size option");
-        return 0;
+        return out;
     }
 
     cb_message(cb, "Calculating size of root...");
@@ -679,29 +691,19 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
             &ok);
     }
 
-    if (!settings.live) {
-        const std::uint64_t rootTotal = static_cast<std::uint64_t>(FileSystemUtilsCpp::bytesTotal(std::string("/")));
-        const std::uint64_t rootFree = static_cast<std::uint64_t>(FileSystemUtilsCpp::bytesFree(std::string("/")));
-        ok = (rootTotal != 0);
-        if (ok) {
-            root_size = (rootTotal - rootFree) / 1024;
-            if (includeHomeDevice) {
-                const std::uint64_t homeTotal
-                    = static_cast<std::uint64_t>(FileSystemUtilsCpp::bytesTotal(std::string("/home")));
-                const std::uint64_t homeFree
-                    = static_cast<std::uint64_t>(FileSystemUtilsCpp::bytesFree(std::string("/home")));
-                ok = (homeTotal != 0);
-                if (ok) {
-                    root_size += (homeTotal - homeFree) / 1024;
-                }
-            }
-        }
+    if (!settings.live && includeHomeDevice) {
+        root_size += WorkCppUtils::parseDuKilobytes(
+            CommandRunner::getOutAsRoot(
+                "du",
+                {"-sx", "-P", "/home"},
+                CommandRunner::QuietMode::Yes),
+            &ok);
     }
 
     if (!ok) {
         cb_warning(cb,
                    "Error: calculating root size.\nIf you are sure you have enough free space rerun the program with -o/--override-size option");
-        return 0;
+        return out;
     }
 
     if (excl_size > root_size) {
@@ -709,10 +711,21 @@ std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
     }
 
     const std::uint8_t c_factor = compression_factor_value_like_settings_qt(settings.compression);
-    
-    const std::uint64_t result = (root_size - excl_size) * static_cast<std::uint64_t>(c_factor) / 100ULL;
-    
-    return result;
+
+    out.ok = true;
+    out.rootKiB = root_size;
+    out.excludesKiB = excl_size;
+    out.compressionPercent = c_factor;
+    out.requiredKiB = (root_size - excl_size) * static_cast<std::uint64_t>(c_factor) / 100ULL;
+    return out;
+}
+
+std::uint64_t WorkSpaceCpp::getRequiredSpaceLikeQt(const SettingsCpp &settings,
+                                                   const std::string &applicationName,
+                                                   const Callbacks &cb)
+{
+    const RequiredSpaceEstimate estimate = getRequiredSpaceEstimateLikeQt(settings, applicationName, cb);
+    return estimate.ok ? estimate.requiredKiB : 0;
 }
 
 WorkSpaceCpp::CheckEnoughSpaceResult WorkSpaceCpp::checkEnoughSpaceLikeQt(const SettingsCpp &settings,

@@ -119,11 +119,13 @@ set(COMMON_SOURCES
     src/qm_translator_cpp.cpp
     src/string_cpp.cpp
     src/settings.cpp
+    src/config_paths.cpp
     src/settings_cpp_builder.cpp
     src/settings_exclusions_cpp.cpp
     src/settings_editor_cpp.cpp
     src/settings_filename_cpp.cpp
     src/settings_space_cpp.cpp
+    src/settings_qt_adapter.cpp
     src/settings_validation_cpp.cpp
     src/settings_xdg_user_dirs_cpp.cpp
     src/settings_process_args_cpp.cpp
@@ -169,6 +171,7 @@ set(COMMON_HEADERS
     src/work_cpp_executor.h
     src/batchprocessing_cpp_plan.h
     src/batchprocessing_cpp_planner.h
+    src/config_paths.h
     src/settings_cpp_builder.h
     src/settings_process_args_cpp.h
     src/work_cpp_utils.h
@@ -194,16 +197,75 @@ set(HELPER_SOURCES
     src/stdio_cpp.h
 )
 
+add_executable(helper
+    ${HELPER_SOURCES}
+)
+
+target_link_libraries(helper
+    i18n_keyval::i18n_keyval
+    embedded_assets
+    crypt
+)
+
+set_target_properties(helper PROPERTIES
+    OUTPUT_NAME "helper"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+if(QT_FREE_GUARDS)
+    add_custom_command(TARGET helper POST_BUILD
+        COMMAND /bin/bash -c "set -euo pipefail; grep -nH '#include <Q' ${CMAKE_SOURCE_DIR}/src/helper.cpp ${CMAKE_SOURCE_DIR}/src/installed_to_live_cpp.cpp ${CMAKE_SOURCE_DIR}/src/process_runner.cpp ${CMAKE_SOURCE_DIR}/src/file_cpp.cpp ${CMAKE_SOURCE_DIR}/src/stdio_cpp.cpp && { echo 'ERROR: Qt include found in qt-free target helper'; exit 1; } || true"
+        COMMAND /bin/bash -c "set -euo pipefail; ldd $<TARGET_FILE:helper> | grep -i qt && { echo 'ERROR: Qt library linked into qt-free target helper'; exit 1; } || true"
+        VERBATIM
+    )
+endif()
+
+set(EMBED_HELPER_BINARY_HEADER "${CMAKE_BINARY_DIR}/embed/generated/helper_binary_payload.h")
+set(EMBED_HELPER_BINARY_SCRIPT "${CMAKE_SOURCE_DIR}/scripts/build_embedded_helper_binary.sh")
+
+add_custom_command(
+    OUTPUT "${EMBED_HELPER_BINARY_HEADER}"
+    COMMAND bash ${EMBED_HELPER_BINARY_SCRIPT} $<TARGET_FILE:helper> "${EMBED_HELPER_BINARY_HEADER}"
+    DEPENDS helper ${EMBED_HELPER_BINARY_SCRIPT}
+    COMMENT "Embedding helper executable"
+    VERBATIM
+)
+
+add_custom_target(embedded_helper_binary_generate DEPENDS "${EMBED_HELPER_BINARY_HEADER}")
+
+add_library(embedded_helper_runtime STATIC
+    ${CMAKE_SOURCE_DIR}/src/embedded/embedded_helper_runtime.cpp
+    ${EMBED_HELPER_BINARY_HEADER}
+)
+
+add_dependencies(embedded_helper_runtime embedded_helper_binary_generate)
+
+target_link_libraries(embedded_helper_runtime
+    PUBLIC
+        embedded_assets
+)
+
+target_include_directories(embedded_helper_runtime
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/src
+    PRIVATE
+        ${CMAKE_BINARY_DIR}/embed/generated
+)
+
+target_compile_features(embedded_helper_runtime PUBLIC cxx_std_20)
+
 # GUI-specific source files
 set(GUI_SOURCES
     src_gui_qt6_cpp_backend/main.cpp
     src_gui_qt6_cpp_backend/mainwindow.cpp
+    src_gui_qt6_cpp_backend/gui_elevation.cpp
     src/about.cpp
     src/messagehandler.cpp
 )
 
 set(GUI_HEADERS
     src_gui_qt6_cpp_backend/mainwindow.h
+    src_gui_qt6_cpp_backend/gui_elevation.h
     src/about.h
     src/messagehandler.h
 )
@@ -256,6 +318,8 @@ if(BUILD_TESTS)
         src/qm_translator_cpp.h
         src/settings.cpp
         src/settings.h
+        src/config_paths.cpp
+        src/config_paths.h
         src/settings_cpp_builder.cpp
         src/settings_cpp_builder.h
         src/settings_exclusions_cpp.cpp
@@ -350,6 +414,7 @@ if(BUILD_TESTS)
         Qt6::Core
         i18n_keyval::i18n_keyval
         embedded_assets
+        embedded_helper_runtime
     )
 
     target_include_directories(unit_tests PRIVATE
@@ -396,33 +461,12 @@ if(BUILD_GUI)
         Qt6::Concurrent
         i18n_keyval::i18n_keyval
         embedded_assets
+        embedded_helper_runtime
     )
 
     set_target_properties(s4-snapshot PROPERTIES
         OUTPUT_NAME "s4-snapshot"
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-    )
-endif()
-
-add_executable(helper
-    ${HELPER_SOURCES}
-)
-
-target_link_libraries(helper
-    i18n_keyval::i18n_keyval
-    crypt
-)
-
-set_target_properties(helper PROPERTIES
-    OUTPUT_NAME "helper"
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-
-if(QT_FREE_GUARDS)
-    add_custom_command(TARGET helper POST_BUILD
-        COMMAND /bin/bash -c "set -euo pipefail; grep -nH '#include <Q' ${CMAKE_SOURCE_DIR}/src/helper.cpp ${CMAKE_SOURCE_DIR}/src/installed_to_live_cpp.cpp ${CMAKE_SOURCE_DIR}/src/process_runner.cpp ${CMAKE_SOURCE_DIR}/src/file_cpp.cpp ${CMAKE_SOURCE_DIR}/src/stdio_cpp.cpp && { echo 'ERROR: Qt include found in qt-free target helper'; exit 1; } || true"
-        COMMAND /bin/bash -c "set -euo pipefail; ldd $<TARGET_FILE:helper> | grep -i qt && { echo 'ERROR: Qt library linked into qt-free target helper'; exit 1; } || true"
-        VERBATIM
     )
 endif()
 
@@ -477,6 +521,8 @@ if(BUILD_CLI)
         target_link_libraries(iso-snapshot-cli-qt
             Qt6::Core
             i18n_keyval::i18n_keyval
+            embedded_assets
+            embedded_helper_runtime
         )
 
         target_include_directories(iso-snapshot-cli-qt PRIVATE
@@ -502,6 +548,7 @@ if(BUILD_CLI)
         src/qm_translator_cpp.cpp
         src/cli_parser_kv_gen.cpp
         src/string_cpp.cpp
+        src/config_paths.cpp
         src/settings_cpp_builder.cpp
         src/settings_exclusions_cpp.cpp
         src/settings_editor_cpp.cpp
@@ -544,6 +591,7 @@ if(BUILD_CLI)
     target_link_libraries(iso-snapshot-cli
         i18n_keyval::i18n_keyval
         embedded_assets
+        embedded_helper_runtime
     )
 
     set_target_properties(iso-snapshot-cli PROPERTIES
@@ -588,9 +636,22 @@ function(set_common_properties target)
     )
 
     # Build type specific optimizations
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
         target_compile_definitions(${target} PRIVATE NDEBUG)
-        target_compile_options(${target} PRIVATE -O3)
+        target_compile_options(${target} PRIVATE
+            -Os
+            -ffunction-sections
+            -fdata-sections
+            -fno-ident
+            -fno-plt
+            -fomit-frame-pointer
+        )
+        target_link_options(${target} PRIVATE
+            -Wl,-O1
+            -Wl,--gc-sections
+            -Wl,--as-needed
+            -s
+        )
 
         # Add LTO - different flags for different compilers
         if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR USE_CLANG)

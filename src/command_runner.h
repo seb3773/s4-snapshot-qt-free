@@ -28,7 +28,14 @@ public:
         std::function<std::string()> loggedInUserName;
     };
 
+    struct GuiElevationHooks {
+        std::function<std::string()> askPassword;
+        std::function<void()> invalidateCachedPassword;
+    };
+
     static void setHooksForTests(const Hooks *hooks);
+    static void setGuiElevationHooks(const GuiElevationHooks *hooks);
+    static void clearGuiElevationHooks();
 
     static std::string elevationTool();
     static bool isCliMode();

@@ -1,8 +1,6 @@
 docs/*                          usr/share/doc/iso-snapshot-cli
 usr/bin/iso-snapshot-cli        usr/bin
-iso-snapshot-cli-exclude.list   etc
-iso-snapshot-cli.conf           etc
+iso-snapshot-cli-exclude.list   usr/share/s4-snapshot
+iso-snapshot-cli.conf           usr/share/s4-snapshot
 manual/iso-snapshot-cli.8.gz    usr/share/man/man8
-obj-*/helper			usr/lib/iso-snapshot-cli
-scripts/*                       usr/share/iso-snapshot-cli/scripts
 obj-*/*.qm                      usr/share/iso-snapshot-cli/locale

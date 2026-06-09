@@ -31,14 +31,41 @@ std::string EmbeddedAssetsRuntime::liveFilesDir(const std::string &workDir)
     return (std::filesystem::path(embeddedRoot(workDir)) / "live-files").string();
 }
 
+std::string EmbeddedAssetsRuntime::runtimeScriptsDir(const std::string &workDir)
+{
+    return (std::filesystem::path(embeddedRoot(workDir)) / "scripts").string();
+}
+
 std::string EmbeddedAssetsRuntime::initrdBuildDir(const std::string &workDir)
 {
     return (std::filesystem::path(embeddedRoot(workDir)) / "initrd-build").string();
 }
 
+std::string EmbeddedAssetsRuntime::initrdScriptsDir(const std::string &initrdBuildDir)
+{
+    return (std::filesystem::path(initrdBuildDir) / "share" / "s4-snapshot" / "scripts").string();
+}
+
+EmbeddedAssetsRuntime::Result EmbeddedAssetsRuntime::extractRuntimeScriptsTo(const std::string &destRoot)
+{
+    Result result;
+    const EmbeddedAssets::Result extract = EmbeddedAssets::extractRuntimeScripts(destRoot);
+    if (!extract.ok) {
+        result.error = std::string("failed to extract embedded runtime scripts: ") + extract.error;
+        return result;
+    }
+    result.ok = true;
+    return result;
+}
+
 bool EmbeddedAssetsRuntime::signalStopRequested()
 {
     return g_signal_stop_requested != 0;
+}
+
+void EmbeddedAssetsRuntime::requestStop()
+{
+    g_signal_stop_requested = 1;
 }
 
 std::string EmbeddedAssetsRuntime::signalStopWorkDir()
@@ -81,6 +108,18 @@ EmbeddedAssetsRuntime::Result EmbeddedAssetsRuntime::prepareWorkspace(SettingsCp
             return result;
         }
         settings.dataFilesPath = dest;
+    }
+
+    {
+        const std::string dest = runtimeScriptsDir(settings.workDir);
+        result = extractRuntimeScriptsTo(dest);
+        if (!result.ok) {
+            if (cb.critical) {
+                cb.critical(result.error);
+            }
+            return result;
+        }
+        settings.runtimeScriptsPath = dest;
     }
 
     std::filesystem::create_directories(initrdBuildDir(settings.workDir), ec);

@@ -38,6 +38,9 @@ public:
 
         // Used when fileArg is empty.
         std::string defaultSnapshotName;
+
+        std::string organizationName;
+        std::string applicationName;
     };
 
 #ifdef UNIT_TESTS

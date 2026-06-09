@@ -12,6 +12,8 @@
 
 #include <chrono>
 
+#include "embedded/embedded_assets_runtime.h"
+
 namespace {
 
 static const ProcessRunner::Hooks *g_hooks = nullptr;
@@ -62,6 +64,29 @@ static void maybe_forward(const std::function<void(const char *, size_t)> &cb, c
     if (cb) {
         cb(data, n);
     }
+}
+
+static bool terminate_child_on_interrupt(pid_t pid)
+{
+    if (!EmbeddedAssetsRuntime::signalStopRequested()) {
+        return false;
+    }
+
+    (void)::kill(pid, SIGTERM);
+
+    for (int attempt = 0; attempt < 60; ++attempt) {
+        int status = 0;
+        const pid_t wp = ::waitpid(pid, &status, WNOHANG);
+        if (wp == pid) {
+            return true;
+        }
+        ::usleep(50'000);
+    }
+
+    (void)::kill(pid, SIGKILL);
+    int status = 0;
+    (void)::waitpid(pid, &status, 0);
+    return true;
 }
 
 static ProcessRunner::Result run_impl(const std::string &program, const std::vector<std::string> &args,
@@ -204,6 +229,12 @@ static ProcessRunner::Result run_impl(const std::string &program, const std::vec
     auto start = std::chrono::steady_clock::now();
 
     while (true) {
+        if (terminate_child_on_interrupt(pid)) {
+            r.exitStatus = ProcessRunner::ExitStatus::CrashExit;
+            r.exitCode = SIGTERM;
+            return r;
+        }
+
         if (timeout_ms >= 0) {
             const auto now = std::chrono::steady_clock::now();
             const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();

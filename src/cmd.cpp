@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "file_cpp.h"
+#include "embedded/embedded_helper_runtime.h"
 #ifdef CLI_BUILD
 #include "messagehandler_cpp.h"
 #else
@@ -23,7 +24,7 @@
 
 Cmd::Cmd(QObject * /*parent*/)
     : elevationToolPath {Cmd::elevationTool()},
-      helperPath {"/usr/lib/" + QCoreApplication::applicationName() + "/helper"}
+      helperPath {}
 {
 }
 
@@ -72,6 +73,13 @@ bool Cmd::helperProc(const QStringList &helperArgs, QString *output, const QByte
         return false;
     }
 
+    const EmbeddedHelperRuntime::Result helper = EmbeddedHelperRuntime::ensureHelperAvailable();
+    if (!helper.ok) {
+        qWarning().noquote() << QString::fromStdString(helper.error);
+        return false;
+    }
+
+    const QString helperPath = QString::fromStdString(helper.path);
     const QString program = (getuid() == 0) ? helperPath : elevationToolPath;
     QStringList programArgs = helperArgs;
     if (getuid() != 0) {
@@ -163,7 +171,7 @@ void Cmd::handleElevationError()
 Cmd::Cmd(QObject *parent)
     : QProcess(parent),
       elevationToolPath {Cmd::elevationTool()},
-      helperPath {"/usr/lib/" + QCoreApplication::applicationName() + "/helper"}
+      helperPath {}
 {
     connect(this, &Cmd::readyReadStandardOutput,
             [this] { emit outputAvailable(QString::fromLocal8Bit(readAllStandardOutput())); });
@@ -254,6 +262,16 @@ bool Cmd::helperProc(const QStringList &helperArgs, QString *output, const QByte
         return false;
     }
 
+    const EmbeddedHelperRuntime::Result helper = EmbeddedHelperRuntime::ensureHelperAvailable();
+    if (!helper.ok) {
+        const QString message = QString::fromStdString(helper.error);
+        qWarning().noquote() << message;
+        emit errorAvailable(message);
+        emit done();
+        return false;
+    }
+
+    const QString helperPath = QString::fromStdString(helper.path);
     const QString program = (getuid() == 0) ? helperPath : elevationToolPath;
     QStringList programArgs = helperArgs;
     if (getuid() != 0) {

@@ -45,14 +45,7 @@ BatchprocessingCppPlan BatchprocessingCppPlanner::planOrchestration(const Settin
         return p;
     }
 
-    // Free space debug output uses getFreeSpaceStrings/getUsedSpace in Qt (not yet Qt-free planned here).
-    // We model orchestration order only.
-    plan_debug(p, "Free space: <computed>");
-    if (!settings.monthly && !settings.overrideSize) {
-        plan_debug(p, "Unused space: <computed>");
-    }
-
-    // work.startTimer() is timing-only.
+    // Free space / used space diagnostics are emitted at runtime by BatchprocessingCppRunner.
 
     if (!env.checkSnapshotDirOk || !env.checkTempDirOk) {
         plan_work(p, "cleanUp", WorkCppPlan{});

@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <system_error>
 #include <unistd.h>
 #include <fstream>
 #include <vector>
@@ -170,7 +171,7 @@ EmbeddedAssets::Result EmbeddedAssets::extractTar(const std::vector<std::uint8_t
                 result.error = std::string("cannot create directory '") + out_path + "': " + ec.message();
                 return result;
             }
-        } else if (header.type == MTAR_TREG || header.type == MTAR_TSYM) {
+        } else if (header.type == MTAR_TREG) {
             if (!ensure_parent_dir(out_path, result.error)) {
                 mtar_close(&tar);
                 return result;
@@ -201,6 +202,43 @@ EmbeddedAssets::Result EmbeddedAssets::extractTar(const std::vector<std::uint8_t
                 }
                 remaining -= chunk;
             }
+            std::filesystem::permissions(out_path,
+                                         static_cast<std::filesystem::perms>(header.mode & 07777),
+                                         std::filesystem::perm_options::replace,
+                                         ec);
+            if (ec) {
+                mtar_close(&tar);
+                result.error = std::string("cannot set permissions on '") + out_path + "': " + ec.message();
+                return result;
+            }
+        } else if (header.type == MTAR_TSYM) {
+            if (!ensure_parent_dir(out_path, result.error)) {
+                mtar_close(&tar);
+                return result;
+            }
+            if (std::filesystem::exists(out_path, ec)) {
+                std::filesystem::remove(out_path, ec);
+            }
+            std::string link_target = header.linkname;
+            if (link_target.empty() && header.size > 0) {
+                std::vector<char> link_data(header.size + 1, '\0');
+                if (mtar_read_data(&tar, link_data.data(), header.size) != MTAR_ESUCCESS) {
+                    mtar_close(&tar);
+                    result.error = std::string("tar symlink target read failed for '") + entry_name + "'";
+                    return result;
+                }
+                link_target = link_data.data();
+            }
+            if (link_target.empty()) {
+                mtar_close(&tar);
+                result.error = std::string("empty symlink target for '") + entry_name + "'";
+                return result;
+            }
+            if (::symlink(link_target.c_str(), out_path.c_str()) != 0) {
+                mtar_close(&tar);
+                result.error = std::string("cannot create symlink '") + out_path + "': " + std::strerror(errno);
+                return result;
+            }
         } else if (header.type == MTAR_TLNK) {
             if (!ensure_parent_dir(out_path, result.error)) {
                 mtar_close(&tar);
@@ -209,9 +247,12 @@ EmbeddedAssets::Result EmbeddedAssets::extractTar(const std::vector<std::uint8_t
             if (std::filesystem::exists(out_path, ec)) {
                 std::filesystem::remove(out_path, ec);
             }
-            if (::symlink(header.linkname, out_path.c_str()) != 0) {
+            const std::filesystem::path link_path = std::filesystem::path(header.linkname).is_absolute()
+                                                      ? std::filesystem::path(header.linkname)
+                                                      : (std::filesystem::path(out_path).parent_path() / header.linkname);
+            if (::link(link_path.c_str(), out_path.c_str()) != 0) {
                 mtar_close(&tar);
-                result.error = std::string("cannot create symlink '") + out_path + "': " + std::strerror(errno);
+                result.error = std::string("cannot create hard link '") + out_path + "': " + std::strerror(errno);
                 return result;
             }
         }
@@ -251,6 +292,14 @@ EmbeddedAssets::Result EmbeddedAssets::extractIsoTemplates(const std::string &de
     options.dest_root = dest_root;
     options.strip_prefix = "iso-templates/";
     return extractPayload(isoTemplatesPayload(), options);
+}
+
+EmbeddedAssets::Result EmbeddedAssets::extractRuntimeScripts(const std::string &dest_root)
+{
+    EmbeddedTarExtractOptions options;
+    options.dest_root = dest_root;
+    options.strip_prefix = "runtime-scripts/";
+    return extractPayload(runtimeScriptsPayload(), options);
 }
 
 EmbeddedAssets::Result EmbeddedAssets::extractIsoTemplateTree(const std::string &dest_root)

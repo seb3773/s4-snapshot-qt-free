@@ -8,11 +8,11 @@
 #include <unistd.h>
 
 #include "command_runner.h"
+#include "config_paths.h"
 #include "dir_cpp.h"
 #include "file_cpp.h"
 #include "filesystemutils_cpp.h"
 #include "qsettings_cpp.h"
-#include "standard_paths_cpp.h"
 #include "string_cpp.h"
 #include "systeminfo_cpp.h"
 
@@ -87,17 +87,6 @@ static void chown_file_to_logged_in_user_std(const std::string &path)
                                    CommandRunner::QuietMode::Yes);
 }
 
-static std::string user_config_base_dir_std(const std::string &username)
-{
-    if (!username.empty()) {
-        const std::string candidate_home = clean_path_std(std::string("/home/") + username);
-        if (DirCpp::exists(candidate_home)) {
-            return clean_path_std(candidate_home + "/.config");
-        }
-    }
-    return StandardPathsCpp::writableConfigLocation();
-}
-
 static std::vector<std::string> build_executable_search_path_std()
 {
     const char *env = std::getenv("PATH");
@@ -126,17 +115,16 @@ SettingsCpp SettingsCppBuilder::buildFromArgs(const SettingsArgsCpp &args,
                                              const std::string &appName,
                                              const std::string &organizationName)
 {
-    const std::string username = logged_in_user_name_std();
-    const std::string config_dir = user_config_base_dir_std(username);
-    const std::string system_path = std::string("/etc/") + appName + ".conf";
-    return buildFromArgsWithPaths(args, isGuiApp, appName, organizationName, system_path, config_dir);
+    const std::string config_dir = S4SnapshotConfig::userConfigBaseDirStd();
+    const std::string defaults_path = S4SnapshotConfig::bundledConfigPath(appName);
+    return buildFromArgsWithPaths(args, isGuiApp, appName, organizationName, defaults_path, config_dir);
 }
 
 SettingsCpp SettingsCppBuilder::buildFromArgsWithPaths(const SettingsArgsCpp &args,
                                                       bool isGuiApp,
                                                       const std::string &appName,
                                                       const std::string &organizationName,
-                                                      const std::string &systemConfigPath,
+                                                      const std::string &defaultsConfigPath,
                                                       const std::string &userConfigBaseDir)
 {
     SettingsCpp out;
@@ -155,13 +143,14 @@ SettingsCpp SettingsCppBuilder::buildFromArgsWithPaths(const SettingsArgsCpp &ar
     out.monthly = args.monthly;
     out.overrideSize = args.overrideSize;
 
-    out.editBootMenu = (QSettingsCpp::iniGeneralValueString(systemConfigPath, "edit_boot_menu", "no") != "no");
+    S4SnapshotConfig::ensureUserConfigFile(userConfigBaseDir, organizationName, appName, defaultsConfigPath);
 
     out.workDir.clear();
     out.snapshotDir.clear();
     out.snapshotName.clear();
     out.tempDirParent.clear();
     out.dataFilesPath.clear();
+    out.runtimeScriptsPath.clear();
     out.shutdown = false;
 
     out.makeIsohybrid = false;
@@ -175,15 +164,9 @@ SettingsCpp SettingsCppBuilder::buildFromArgsWithPaths(const SettingsArgsCpp &ar
     out.mksqOpt.clear();
     out.bootOptions.clear();
 
-    const std::string system_path = systemConfigPath;
-    const std::map<std::string, std::string> system_kv = QSettingsCpp::nativeGeneralAllKeyValues(system_path);
-
     const std::string config_dir = userConfigBaseDir;
     const std::string user_primary_path = QSettingsCpp::nativeUserPrimaryFilePathFromBaseDir(config_dir, organizationName, appName);
 
-    const auto user_contains = [&](const std::string &key) -> bool {
-        return QSettingsCpp::nativeUserContainsKeyFromBaseDir(config_dir, organizationName, appName, key);
-    };
     const auto user_value = [&](const std::string &key, const std::string &def) -> std::string {
         return QSettingsCpp::nativeUserValueStringFromBaseDir(config_dir, organizationName, appName, key, def);
     };
@@ -191,11 +174,7 @@ SettingsCpp SettingsCppBuilder::buildFromArgsWithPaths(const SettingsArgsCpp &ar
         (void)QSettingsCpp::nativeGeneralSetValueString(user_primary_path, key, value);
     };
 
-    for (const auto &kv : system_kv) {
-        if (!user_contains(kv.first)) {
-            user_set(kv.first, kv.second);
-        }
-    }
+    out.editBootMenu = (user_value("edit_boot_menu", "no") != "no");
 
     out.sessionExcludes.clear();
 
@@ -206,50 +185,38 @@ SettingsCpp SettingsCppBuilder::buildFromArgsWithPaths(const SettingsArgsCpp &ar
 
     out.guiEditor = trim_quotes_like_settings_cpp(user_value("gui_editor", ""));
 
-    const std::string user_config_dir = clean_path_std(config_dir + "/" + organizationName);
-    const std::string user_excludes_path = clean_path_std(user_config_dir + "/" + appName + "-exclude.list");
+    const std::string user_config_dir = S4SnapshotConfig::userConfigDirFromBase(config_dir, organizationName);
+    const std::string user_excludes_path = S4SnapshotConfig::userExcludesPathFromBase(config_dir, organizationName, appName);
 
-    const std::string system_excludes_path = clean_path_std(std::string("/etc/") + appName + "-exclude.list");
+    const std::string bundled_excludes_path = S4SnapshotConfig::bundledExcludesPath(appName);
+    const std::string legacy_bundled_excludes_path = S4SnapshotConfig::legacyBundledExcludesPath(appName);
     const std::string local_path = clean_path_std(std::string("/usr/local/share/excludes/") + appName + "-exclude.list");
-    const std::string usr_path = clean_path_std(std::string("/usr/share/excludes/") + appName + "-exclude.list");
 #ifdef UNIT_TESTS
     const std::string fallback_excludes_path = !g_ut_fallback_excludes_path_override.empty()
         ? g_ut_fallback_excludes_path_override
-        : (FileCpp::exists(local_path) ? local_path : usr_path);
+        : (FileCpp::exists(local_path) ? local_path : legacy_bundled_excludes_path);
     out.excludesSourcePath = !g_ut_excludes_source_path_override.empty()
         ? g_ut_excludes_source_path_override
-        : (FileCpp::exists(system_excludes_path) ? system_excludes_path : fallback_excludes_path);
+        : (FileCpp::exists(bundled_excludes_path) ? bundled_excludes_path : fallback_excludes_path);
 #else
-    const std::string fallback_excludes_path = FileCpp::exists(local_path) ? local_path : usr_path;
-    out.excludesSourcePath = FileCpp::exists(system_excludes_path) ? system_excludes_path : fallback_excludes_path;
+    const std::string fallback_excludes_path = FileCpp::exists(local_path) ? local_path : legacy_bundled_excludes_path;
+    out.excludesSourcePath = FileCpp::exists(bundled_excludes_path) ? bundled_excludes_path : fallback_excludes_path;
 #endif
 
-    const bool user_configured_snapshot_excludes = user_contains("snapshot_excludes");
-    const std::string system_snapshot_excludes = trim_quotes_like_settings_cpp(QSettingsCpp::iniGeneralValueString(system_path, "snapshot_excludes", ""));
+    S4SnapshotConfig::ensureUserExcludesFile(config_dir, organizationName, appName, out.excludesSourcePath);
 
-    std::string configured_excludes_path = trim_quotes_like_settings_cpp(user_value("snapshot_excludes", user_excludes_path));
-    if (!user_configured_snapshot_excludes || configured_excludes_path == system_snapshot_excludes) {
-        configured_excludes_path = user_excludes_path;
-        user_set("snapshot_excludes", configured_excludes_path);
+    const std::string configured_excludes_path =
+        trim_quotes_like_settings_cpp(user_value("snapshot_excludes", user_excludes_path));
+    const std::string canonical_excludes_path = S4SnapshotConfig::normalizeUserExcludesToCanonical(
+        config_dir, organizationName, appName, configured_excludes_path);
+    user_set("snapshot_excludes", canonical_excludes_path);
+    if (!FileCpp::exists(canonical_excludes_path)) {
+        (void)FileCpp::copy(fallback_excludes_path, canonical_excludes_path);
     }
-
-    const bool using_default_user_path = (configured_excludes_path == user_excludes_path);
-    if (using_default_user_path && !FileCpp::exists(user_excludes_path)) {
-        if (!out.excludesSourcePath.empty() && FileCpp::exists(out.excludesSourcePath)) {
-            (void)DirCpp().mkpath(user_config_dir);
-            if (FileCpp::copy(out.excludesSourcePath, user_excludes_path)) {
-                chown_file_to_logged_in_user_std(user_excludes_path);
-            }
-        }
-    }
-
-    if (!FileCpp::exists(configured_excludes_path)) {
-        configured_excludes_path = fallback_excludes_path;
-    }
-    out.snapshotExcludesPath = configured_excludes_path;
+    out.snapshotExcludesPath = canonical_excludes_path;
 
     chown_file_to_logged_in_user_std(user_primary_path);
-    chown_file_to_logged_in_user_std(configured_excludes_path);
+    chown_file_to_logged_in_user_std(canonical_excludes_path);
 
     out.makeMd5sum = (user_value("make_md5sum", "no") != "no");
     out.makeSha512sum = (user_value("make_sha512sum", "no") != "no");

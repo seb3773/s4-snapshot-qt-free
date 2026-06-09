@@ -1,12 +1,13 @@
 #include "systeminfo_cpp.h"
 
-#include <cstdio>
-#include <cstring>
+#include <cstdlib>
+#include <filesystem>
 #include <string>
 #include <unistd.h>
 #include <vector>
 
 #include "command_runner.h"
+#include "embedded/embedded_assets_runtime.h"
 #include "process_runner.h"
 
 namespace {
@@ -14,40 +15,6 @@ namespace {
 #ifdef UNIT_TESTS
 static const SystemInfoCpp::Hooks *g_hooks = nullptr;
 #endif
-
-std::string basename_qt_fileinfo_basename_semantics(const std::string &path)
-{
-    const char *s = path.c_str();
-    const char *slash = std::strrchr(s, '/');
-    std::string file = slash ? std::string(slash + 1) : path;
-    const std::size_t dot = file.rfind('.');
-    if (dot != std::string::npos && dot != 0) {
-        file.resize(dot);
-    }
-    return file;
-}
-
-std::string proc_self_cmdline_argv0()
-{
-    FILE *f = std::fopen("/proc/self/cmdline", "rb");
-    if (!f) {
-        return std::string();
-    }
-    std::string buf;
-    buf.resize(4096);
-    const std::size_t n = std::fread(buf.data(), 1, buf.size(), f);
-    std::fclose(f);
-    if (n == 0) {
-        return std::string();
-    }
-    const std::size_t end0 = buf.find('\0');
-    if (end0 == std::string::npos) {
-        buf.resize(n);
-        return buf;
-    }
-    buf.resize(end0);
-    return buf;
-}
 
 std::vector<std::string> split_newline_keep_empty_parts(const std::string &s)
 {
@@ -62,6 +29,39 @@ std::vector<std::string> split_newline_keep_empty_parts(const std::string &s)
     }
     out.emplace_back(s.substr(start));
     return out;
+}
+
+std::string getenv_non_empty(const char *name)
+{
+    const char *value = std::getenv(name);
+    return (value && *value) ? std::string(value) : std::string();
+}
+
+std::string runtime_scripts_cache_dir()
+{
+    const std::string xdg_cache_home = getenv_non_empty("XDG_CACHE_HOME");
+    if (!xdg_cache_home.empty() && xdg_cache_home.front() == '/') {
+        return (std::filesystem::path(xdg_cache_home) / "s4-snapshot" / "runtime-scripts").string();
+    }
+
+    const std::string home = getenv_non_empty("HOME");
+    if (!home.empty() && home.front() == '/') {
+        return (std::filesystem::path(home) / ".cache" / "s4-snapshot" / "runtime-scripts").string();
+    }
+
+    return (std::filesystem::path("/tmp") / ("s4-snapshot-" + std::to_string(static_cast<long long>(::getuid())))
+            / "runtime-scripts")
+        .string();
+}
+
+std::string normalize_script_lines_to_spaces(std::string text)
+{
+    for (char &ch : text) {
+        if (ch == '\n' || ch == '\r') {
+            ch = ' ';
+        }
+    }
+    return text;
 }
 } // namespace
 
@@ -96,9 +96,17 @@ std::vector<std::string> SystemInfoCpp::listUsers()
 
 std::string SystemInfoCpp::readKernelOpts()
 {
-    const std::string argv0 = proc_self_cmdline_argv0();
-    const std::string appName = basename_qt_fileinfo_basename_semantics(argv0);
-    const std::string cmd
-        = std::string("/usr/share/") + appName + "/scripts/snapshot-bootparameter.sh | tr '\n' ' '";
-    return CommandRunner::getOut(cmd);
+    const std::string cacheDir = runtime_scripts_cache_dir();
+    const EmbeddedAssetsRuntime::Result extract = EmbeddedAssetsRuntime::extractRuntimeScriptsTo(cacheDir);
+    if (!extract.ok) {
+        return std::string();
+    }
+
+    const ProcessRunner::Result result = ProcessRunner::run(
+        (std::filesystem::path(cacheDir) / "snapshot-bootparameter.sh").string(), {});
+    if (!result.started || result.exitStatus != ProcessRunner::ExitStatus::NormalExit || result.exitCode != 0) {
+        return std::string();
+    }
+
+    return normalize_script_lines_to_spaces(result.stdoutText);
 }
