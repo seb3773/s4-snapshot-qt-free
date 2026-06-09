@@ -164,4 +164,20 @@ void persistSnapshotDir(const std::string &configBaseDir,
     chown_file_to_logged_in_user_std(user_primary_path);
 }
 
+void persistWorkDir(const std::string &configBaseDir,
+                    const std::string &organizationName,
+                    const std::string &appName,
+                    const std::string &workDir)
+{
+    if (workDir.empty()) {
+        return;
+    }
+
+    const std::string user_primary_path =
+        QSettingsCpp::nativeUserPrimaryFilePathFromBaseDir(configBaseDir, organizationName, appName);
+    (void)DirCpp().mkpath(userConfigDirFromBase(configBaseDir, organizationName));
+    (void)QSettingsCpp::nativeGeneralSetValueString(user_primary_path, "workdir", workDir);
+    chown_file_to_logged_in_user_std(user_primary_path);
+}
+
 } // namespace S4SnapshotConfig

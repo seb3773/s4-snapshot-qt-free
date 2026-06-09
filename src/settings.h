@@ -130,6 +130,7 @@ public:
     void handleInitializationError(const QString &error) const;
     void loadConfig();
     void persistSnapshotDir();
+    void persistWorkDir();
     void otherExclusions();
     void processArgs(
 #ifdef CLI_BUILD

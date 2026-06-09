@@ -10,7 +10,7 @@
 # * (at your option) any later version.
 # **********************************************************************
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -46,7 +46,7 @@ if [ ! -f "libs/i18n_keyval/CMakeLists.txt" ]; then
     fi
 fi
 
-echo "Step 1/3: Configuring..."
+echo "Step 1/4: Configuring..."
 cmake -B "$BUILD_DIR" \
     -DBUILD_GUI=OFF \
     -DBUILD_CLI=ON \
@@ -56,7 +56,7 @@ cmake -B "$BUILD_DIR" \
     -DCMAKE_BUILD_TYPE=Release
 
 echo ""
-echo "Step 2/3: Building..."
+echo "Step 2/4: Building..."
 cmake --build "$BUILD_DIR" -j"$JOBS"
 
 echo ""

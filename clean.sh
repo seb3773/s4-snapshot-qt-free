@@ -10,7 +10,7 @@
 # * (at your option) any later version.
 # **********************************************************************
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -60,9 +60,9 @@ echo ""
 echo "✓ Clean complete!"
 echo ""
 echo "You can now run one of the build scripts:"
-echo "  ./build_cli_qtfree.sh  - Build Qt-free CLI (recommended)"
+echo "  ./build_cli_qtfree.sh  - Build Qt-free CLI"
 echo "  ./build_gui.sh         - Build GUI"
-echo "  ./build_tests.sh       - Build test suite"
-echo "  ./build_all.sh         - Build everything"
+echo "  ./build_tests.sh       - Build and run test suite (--build-only to skip run)"
+echo "  ./build_all.sh         - Build CLI, GUI, and tests"
 
 # Made with Bob

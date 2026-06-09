@@ -1734,6 +1734,15 @@ void Settings::persistSnapshotDir()
         snapshotDir.toStdString());
 }
 
+void Settings::persistWorkDir()
+{
+    S4SnapshotConfig::persistWorkDir(
+        userConfigBaseDir().toStdString(),
+        organizationName.toStdString(),
+        applicationName.toStdString(),
+        tempDirParent.toStdString());
+}
+
 // Load settings from config file
 void Settings::loadConfig()
 {

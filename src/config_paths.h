@@ -42,4 +42,9 @@ void persistSnapshotDir(const std::string &configBaseDir,
                         const std::string &appName,
                         const std::string &snapshotDir);
 
+void persistWorkDir(const std::string &configBaseDir,
+                    const std::string &organizationName,
+                    const std::string &appName,
+                    const std::string &workDir);
+
 } // namespace S4SnapshotConfig

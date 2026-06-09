@@ -240,6 +240,30 @@ color: rgb(0, 0, 0);</string>
             </property>
            </widget>
           </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="labelWorkDir">
+            <property name="text">
+             <string>Work directory:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="lineEditWorkDir">
+            <property name="toolTip">
+             <string>Temporary working directory used while building the ISO. Defaults to the location with the most free space.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QPushButton" name="btnSelectWorkDir">
+            <property name="text">
+             <string>Select work directory</string>
+            </property>
+            <property name="icon">
+             <iconset theme="cursor-arrow"/>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
@@ -1014,6 +1038,8 @@ li.checked::marker { content: &quot;\2612&quot;; }
  </widget>
  <tabstops>
   <tabstop>btnSelectSnapshot</tabstop>
+  <tabstop>lineEditWorkDir</tabstop>
+  <tabstop>btnSelectWorkDir</tabstop>
   <tabstop>lineEditName</tabstop>
   <tabstop>textProjectName</tabstop>
   <tabstop>textDistroVersion</tabstop>

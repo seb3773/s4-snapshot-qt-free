@@ -330,6 +330,8 @@ if(BUILD_TESTS)
         src/settings_filename_cpp.h
         src/settings_space_cpp.cpp
         src/settings_space_cpp.h
+        src/settings_qt_adapter.cpp
+        src/settings_qt_adapter.h
         src/settings_validation_cpp.cpp
         src/settings_validation_cpp.h
         src/settings_xdg_user_dirs_cpp.cpp

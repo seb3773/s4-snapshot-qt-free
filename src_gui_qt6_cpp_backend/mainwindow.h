@@ -74,6 +74,7 @@ private slots:
     void btnHelp_clicked();
     void btnNext_clicked();
     void btnSelectSnapshot_clicked();
+    void btnSelectWorkDir_clicked();
     void cbCompression_currentIndexChanged();
     void checkMd5_toggled(bool checked);
     void checkSha512_toggled(bool checked);
@@ -111,6 +112,10 @@ private:
     void handleBackendLog(const std::string& log);
     bool shouldAbortBackend();
     void requestOperationCancel();
+
+    [[nodiscard]] QString defaultWorkDirParent() const;
+    void refreshWorkDirField();
+    [[nodiscard]] bool applyWorkDirFromField(QString *errorMessage = nullptr);
     
     // Async execution handlers
     void startBackgroundProcessing(const SettingsCpp &cppSettings,

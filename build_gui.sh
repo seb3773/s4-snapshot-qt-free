@@ -10,7 +10,7 @@
 # * (at your option) any later version.
 # **********************************************************************
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -22,7 +22,7 @@ BUILD_DIR="build-gui"
 JOBS=$(nproc)
 
 echo "=========================================="
-echo "S4 Snapshot - Build GUI + CLI"
+echo "S4 Snapshot - Build GUI"
 echo "=========================================="
 echo ""
 echo "Targets: s4-snapshot (GUI), helper"
@@ -53,7 +53,7 @@ if [ ! -f "libs/i18n_keyval/CMakeLists.txt" ]; then
     fi
 fi
 
-echo "Step 1/2: Configuring..."
+echo "Step 1/3: Configuring..."
 cmake -B "$BUILD_DIR" \
     -DBUILD_GUI=ON \
     -DBUILD_CLI=OFF \

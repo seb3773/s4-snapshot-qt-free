@@ -10,7 +10,7 @@
 # * (at your option) any later version.
 # **********************************************************************
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -22,18 +22,24 @@ echo ""
 echo "This will build:"
 echo "  1. Qt-free CLI (iso-snapshot-cli)"
 echo "  2. GUI (s4-snapshot)"
-echo "  3. Qt-based CLI (iso-snapshot-cli-qt, for comparison)"
-echo "  4. Test suite (unit_tests)"
+echo "  3. Test suite (unit_tests, build only)"
 echo ""
 
-# Check for -y or --yes argument to skip confirmation
 SKIP_CONFIRM=false
-if [ "$1" = "-y" ] || [ "$1" = "--yes" ]; then
-    SKIP_CONFIRM=true
-fi
+RUN_TESTS=false
+for arg in "$@"; do
+    case "$arg" in
+        -y|--yes)
+            SKIP_CONFIRM=true
+            ;;
+        --run-tests)
+            RUN_TESTS=true
+            ;;
+    esac
+done
 
 if [ "$SKIP_CONFIRM" = false ]; then
-    read -p "Continue? (y/N) " -n 1 -r
+    read -r -p "Continue? (y/N) " -n 1 REPLY
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "Aborted."
@@ -49,15 +55,9 @@ echo "=========================================="
 
 echo ""
 echo "=========================================="
-echo "Building GUI + CLI..."
+echo "Building GUI..."
 echo "=========================================="
 ./build_gui.sh
-
-echo ""
-echo "=========================================="
-echo "Building Qt-Based CLI (Legacy)..."
-echo "=========================================="
-./build_cli_qt.sh
 
 echo ""
 echo "=========================================="
@@ -71,15 +71,18 @@ echo "All Builds Complete!"
 echo "=========================================="
 echo ""
 echo "Summary:"
-echo "  Qt-free CLI:     build-make/iso-snapshot-cli"
-echo "  GUI:             build-gui/s4-snapshot"
-echo "  Qt-based CLI:    build-qt/iso-snapshot-cli-qt"
-echo "  Helper:          build-make/helper, build-gui/helper"
-echo "  Tests:           build-tests/unit_tests"
+echo "  Qt-free CLI:  build-make/iso-snapshot-cli"
+echo "  GUI:          build-gui/s4-snapshot"
+echo "  Helper:       build-make/helper, build-gui/helper"
+echo "  Tests:        build-tests/unit_tests"
 echo ""
 echo "Quick start:"
 echo "  ./build-make/iso-snapshot-cli --help"
-echo "  sudo ./build-gui/s4-snapshot"
+echo "  ./build-gui/s4-snapshot"
 echo ""
-
-# Made with Bob
+if [ "$RUN_TESTS" = false ]; then
+    echo "To run oracle tests:"
+    echo "  ./build_tests.sh"
+    echo "  ./build_all.sh --run-tests"
+    echo ""
+fi

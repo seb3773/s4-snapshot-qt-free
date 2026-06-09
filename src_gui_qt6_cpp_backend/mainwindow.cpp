@@ -65,6 +65,9 @@
 #include "work_cpp_planner.h"
 #include "command_runner.h"
 #include "embedded/embedded_assets_runtime.h"
+#include "dir_cpp.h"
+#include "file_cpp.h"
+#include "filesystemutils_cpp.h"
 #include <chrono>
 #include <utime.h>
 
@@ -131,6 +134,7 @@ void MainWindow::loadSettings()
 
     updateCustomExcludesButton();
     watchExcludesFile();
+    refreshWorkDirField();
 }
 
 bool MainWindow::hasCustomExcludes() const
@@ -402,6 +406,7 @@ void MainWindow::setConnections()
     connect(ui->btnHelp, &QPushButton::clicked, this, &MainWindow::btnHelp_clicked);
     connect(ui->btnNext, &QPushButton::clicked, this, &MainWindow::btnNext_clicked);
     connect(ui->btnSelectSnapshot, &QPushButton::clicked, this, &MainWindow::btnSelectSnapshot_clicked);
+    connect(ui->btnSelectWorkDir, &QPushButton::clicked, this, &MainWindow::btnSelectWorkDir_clicked);
     connect(ui->cbCompression, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &MainWindow::cbCompression_currentIndexChanged);
     connect(ui->checkMd5, &QCheckBox::toggled, this, &MainWindow::checkMd5_toggled);
@@ -671,6 +676,12 @@ void MainWindow::showErrorMessageBox(const QString &file_path)
 
 void MainWindow::handleSelectionPage(const QString &file_name)
 {
+    QString workDirError;
+    if (!applyWorkDirFromField(&workDirError)) {
+        QMessageBox::critical(this, tr("Error"), workDirError);
+        return;
+    }
+
     if (!settings->validateSpaceRequirements()) {
         processMsgBox(BoxType::critical, tr("Error"),
                       tr("Insufficient free space. Please select a different snapshot directory or free up space."));
@@ -685,7 +696,8 @@ void MainWindow::handleSelectionPage(const QString &file_name)
     settings->selectKernel();
     ui->labelTitleSummary->setText(tr("Snapshot will use the following settings:"));
 
-    ui->labelSummary->setText("\n" + tr("- Snapshot directory:") + " " + settings->snapshotDir + "\n" + "- "
+    ui->labelSummary->setText("\n" + tr("- Snapshot directory:") + " " + settings->snapshotDir + "\n"
+                              + tr("- Work directory:") + " " + settings->tempDirParent + "\n" + "- "
                               + tr("Snapshot name:") + " " + file_name + "\n" + tr("- Kernel to be used:") + " "
                               + settings->kernel + "\n");
     settings->codename = ui->textCodename->text();
@@ -1145,7 +1157,89 @@ void MainWindow::btnSelectSnapshot_clicked()
         settings->persistSnapshotDir();
         ui->labelSnapshotDir->setText(settings->snapshotDir);
         listFreeSpace();
+        refreshWorkDirField();
     }
+}
+
+void MainWindow::btnSelectWorkDir_clicked()
+{
+    QString initialDir = ui->lineEditWorkDir->text().trimmed();
+    if (initialDir.isEmpty() || !QFileInfo::exists(initialDir)) {
+        initialDir = defaultWorkDirParent();
+    }
+
+    const QString selected = QFileDialog::getExistingDirectory(this, tr("Select Work Directory"), initialDir,
+                                                               QFileDialog::ShowDirsOnly);
+    if (selected.isEmpty()) {
+        return;
+    }
+
+    ui->lineEditWorkDir->setText(selected);
+    QString error;
+    if (!applyWorkDirFromField(&error)) {
+        QMessageBox::critical(this, tr("Error"), error);
+        refreshWorkDirField();
+    }
+}
+
+QString MainWindow::defaultWorkDirParent() const
+{
+    QString parent;
+    if (FileSystemUtilsCpp::isOnSupportedPartition(settings->snapshotDir.toStdString())) {
+        parent = QString::fromStdString(
+            FileSystemUtilsCpp::largerFreeSpace("/tmp", "/home", settings->snapshotDir.toStdString()));
+    } else {
+        parent = QString::fromStdString(FileSystemUtilsCpp::largerFreeSpace("/tmp", "/home"));
+    }
+
+    if (parent == QStringLiteral("/home")) {
+        QString userName = QString::fromUtf8(qgetenv("SUDO_USER")).trimmed();
+        if (userName.isEmpty()) {
+            userName = QString::fromUtf8(qgetenv("LOGNAME")).trimmed();
+        }
+        if (!userName.isEmpty()) {
+            parent = QStringLiteral("/home/") + userName;
+        }
+    }
+
+    return parent;
+}
+
+void MainWindow::refreshWorkDirField()
+{
+    QString display = settings->tempDirParent.trimmed();
+    if (display.isEmpty() || !FileCpp::exists(display.toStdString())) {
+        display = defaultWorkDirParent();
+    }
+    ui->lineEditWorkDir->setText(display);
+}
+
+bool MainWindow::applyWorkDirFromField(QString *errorMessage)
+{
+    QString path = ui->lineEditWorkDir->text().trimmed();
+    if (path.isEmpty()) {
+        path = defaultWorkDirParent();
+        ui->lineEditWorkDir->setText(path);
+    }
+
+    if (!FileCpp::exists(path.toStdString())) {
+        if (errorMessage) {
+            *errorMessage = tr("Work directory does not exist: %1").arg(path);
+        }
+        return false;
+    }
+
+    if (!FileSystemUtilsCpp::isOnSupportedPartition(path.toStdString())) {
+        if (errorMessage) {
+            *errorMessage = tr("Work directory is on an unsupported partition: %1").arg(path);
+        }
+        return false;
+    }
+
+    settings->tempDirParent = QString::fromLocal8Bit(DirCpp::absolutePath(path.toStdString()).c_str());
+    ui->lineEditWorkDir->setText(settings->tempDirParent);
+    settings->persistWorkDir();
+    return true;
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
@@ -1375,6 +1469,8 @@ void MainWindow::enableControls(bool enable)
     ui->btnAbout->setEnabled(enable);
     ui->btnHelp->setEnabled(enable);
     ui->btnSelectSnapshot->setEnabled(enable);
+    ui->lineEditWorkDir->setEnabled(enable);
+    ui->btnSelectWorkDir->setEnabled(enable);
     ui->btnEditExclude->setEnabled(enable);
     ui->btnRemoveCustomExclude->setEnabled(enable);
     
