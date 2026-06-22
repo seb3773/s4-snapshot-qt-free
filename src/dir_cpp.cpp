@@ -144,6 +144,68 @@ bool statType(const std::string &path, bool *isDir, bool *isReg, bool *isSym)
     return true;
 }
 
+bool pathHasPrefix(const std::string &path, const std::string &prefix)
+{
+    if (path.size() < prefix.size()) {
+        return false;
+    }
+    return path.compare(0, prefix.size(), prefix) == 0;
+}
+
+bool isPathSafeForRecursiveRemoval(const std::string &path)
+{
+    if (path.empty()) {
+        return false;
+    }
+
+    static const char *kForbiddenExact[] = {
+        "/",
+        "/home",
+        "/usr",
+        "/etc",
+        "/var",
+        "/boot",
+        "/root",
+        nullptr,
+    };
+    for (const char *const *p = kForbiddenExact; *p != nullptr; ++p) {
+        if (path == *p) {
+            return false;
+        }
+    }
+
+    static const char *kForbiddenPrefix[] = {
+        "/etc/",
+        "/usr/",
+        "/var/",
+        "/boot/",
+        "/root/",
+        nullptr,
+    };
+    for (const char *const *p = kForbiddenPrefix; *p != nullptr; ++p) {
+        if (pathHasPrefix(path, *p)) {
+            return false;
+        }
+    }
+
+    if (pathHasPrefix(path, "/tmp/")) {
+        return true;
+    }
+    if (pathHasPrefix(path, "/run/")) {
+        return true;
+    }
+    if (path.find("/_embedded/") != std::string::npos) {
+        return true;
+    }
+
+    // /home/... is only allowed for tool-managed embedded trees (handled above).
+    if (pathHasPrefix(path, "/home/")) {
+        return false;
+    }
+
+    return false;
+}
+
 bool removeRecursivelyImpl(const std::string &path)
 {
     bool isDir = false;
@@ -432,6 +494,9 @@ bool DirCpp::removeRecursively() const
         return g_hooks->removeRecursively(p);
     }
     if (p.empty()) {
+        return false;
+    }
+    if (!isPathSafeForRecursiveRemoval(p)) {
         return false;
     }
     return removeRecursivelyImpl(p);

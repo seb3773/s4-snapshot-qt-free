@@ -3,9 +3,11 @@
 #include "embedded_assets.h"
 #include "settings_cpp.h"
 
+#include <atomic>
 #include <csignal>
 #include <cstring>
 #include <filesystem>
+#include <signal.h>
 
 namespace {
 
@@ -60,6 +62,7 @@ EmbeddedAssetsRuntime::Result EmbeddedAssetsRuntime::extractRuntimeScriptsTo(con
 
 bool EmbeddedAssetsRuntime::signalStopRequested()
 {
+    std::atomic_signal_fence(std::memory_order_acquire);
     return g_signal_stop_requested != 0;
 }
 
@@ -140,16 +143,27 @@ void EmbeddedAssetsRuntime::installSignalCleanup(const std::string &workDir)
     std::strncpy(g_signal_cleanup_work_dir, workDir.c_str(), kSignalCleanupPathMax);
     g_signal_cleanup_work_dir[kSignalCleanupPathMax] = '\0';
     g_signal_stop_requested = 0;
-    std::signal(SIGINT, handle_embedded_cleanup_signal);
-    std::signal(SIGTERM, handle_embedded_cleanup_signal);
+    std::atomic_signal_fence(std::memory_order_release);
+
+    struct sigaction sa {};
+    sa.sa_handler = handle_embedded_cleanup_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    (void)sigaction(SIGINT, &sa, nullptr);
+    (void)sigaction(SIGTERM, &sa, nullptr);
 }
 
 void EmbeddedAssetsRuntime::clearSignalCleanup()
 {
     g_signal_cleanup_work_dir[0] = '\0';
     g_signal_stop_requested = 0;
-    std::signal(SIGINT, SIG_DFL);
-    std::signal(SIGTERM, SIG_DFL);
+
+    struct sigaction sa {};
+    sa.sa_handler = SIG_DFL;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    (void)sigaction(SIGINT, &sa, nullptr);
+    (void)sigaction(SIGTERM, &sa, nullptr);
 }
 
 void EmbeddedAssetsRuntime::cleanupEmbeddedTree(const std::string &workDir)

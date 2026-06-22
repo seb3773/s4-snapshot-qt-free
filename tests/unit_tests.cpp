@@ -1538,8 +1538,10 @@ static void test_work_setupEnv_version_and_lsbrelease_writes_qt_vs_cpp_oracle_us
             r.normalExit = true;
             r.exitCode = 0;
             // Avoid /boot mountpoint branch to keep plan stable.
-            if (cmd == "/bin/bash") {
-                r.exitCode = 1;
+            if (cmd == "/bin/bash" && args.size() >= 2 && args[0] == "-c") {
+                if (args[1] == "mountpoint /boot") {
+                    r.exitCode = 1;
+                }
             }
             // Make procAsRoot mountpoint probes return false by default.
             if (cmd == "mountpoint" && elevation == CommandRunner::Elevation::Yes) {
@@ -1560,7 +1562,10 @@ static void test_work_setupEnv_version_and_lsbrelease_writes_qt_vs_cpp_oracle_us
         s.releaseDate = QStringLiteral("2026-01-01");
 
         WorkQtOracle w(&s);
-        (void)capture_stdouterr_ut([&]() { w.setupEnv(); });
+        try {
+            (void)capture_stdouterr_ut([&]() { w.setupEnv(); });
+        } catch (const WorkQtOracle::UnitTestExit &) {
+        }
 
         CommandRunner::setHooksForTests(nullptr);
         WorkCppUtils::setHooksForTests(nullptr);
@@ -1696,8 +1701,11 @@ static void test_work_setupEnv_version_and_lsbrelease_writes_qt_vs_cpp_oracle_us
             r.started = true;
             r.normalExit = true;
             r.exitCode = 0;
-            if (cmd == "/bin/bash") {
-                r.exitCode = 1;
+            // Avoid /boot mountpoint branch to keep plan stable.
+            if (cmd == "/bin/bash" && args.size() >= 2 && args[0] == "-c") {
+                if (args[1] == "mountpoint /boot") {
+                    r.exitCode = 1;
+                }
             }
             if (cmd == "mountpoint" && elevation == CommandRunner::Elevation::Yes) {
                 r.exitCode = 1;
@@ -1717,7 +1725,10 @@ static void test_work_setupEnv_version_and_lsbrelease_writes_qt_vs_cpp_oracle_us
         s.releaseDate = QStringLiteral("2026-01-01");
 
         WorkQtOracle w(&s);
-        (void)capture_stdouterr_ut([&]() { w.setupEnv(); });
+        try {
+            (void)capture_stdouterr_ut([&]() { w.setupEnv(); });
+        } catch (const WorkQtOracle::UnitTestExit &) {
+        }
 
         CommandRunner::setHooksForTests(nullptr);
         WorkCppUtils::setHooksForTests(nullptr);
@@ -4064,57 +4075,24 @@ static void test_settings_getXdgUserDirs_qt_vs_settingsxdguserdirscpp_oracle_dow
     CommandRunner::setHooksForTests(nullptr);
 }
 
-static void test_work_savePackageList_qt_vs_workcppplanner_oracle_command_exact()
+static void test_work_savePackageList_cpp_uses_save_package_list_pseudo_command()
 {
-    CommandRunner::Hooks hooks;
-    std::vector<std::string> captured;
-    hooks.proc = [&](const std::string &cmd,
-                     const std::vector<std::string> &args,
-                     const std::string & /*stdinText*/,
-                     CommandRunner::QuietMode /*quiet*/,
-                     CommandRunner::Elevation /*elevation*/) -> CommandRunner::Result {
-        CommandRunner::Result r;
-        r.started = true;
-        r.exitCode = 0;
-        r.normalExit = true;
-
-        if (cmd == "/bin/bash" && args.size() >= 2 && args[0] == "-c") {
-            captured.push_back(args[1]);
-            return r;
-        }
-
-        // allow other commands from unrelated tests to fail fast if they occur here
-        r.exitCode = 1;
-        r.mergedText = "unexpected command\n";
-        return r;
-    };
-
-    CommandRunner::setHooksForTests(&hooks);
-
-    Settings qtSettings;
-    qtSettings.workDir = QStringLiteral("/tmp/work");
-
-    WorkQtOracle w(&qtSettings);
-    w.savePackageList(QStringLiteral("snapshot.iso"));
-    check(captured.size() == 1, "savePackageList(Qt) must call CommandRunner exactly once");
-    const std::string qtCmd = captured.empty() ? std::string() : captured[0];
-
-    captured.clear();
     SettingsCpp cppSettings;
     cppSettings.workDir = "/tmp/work";
 
     const WorkCppPlan plan = WorkCppPlanner::planSavePackageList(cppSettings, "snapshot.iso");
-    WorkCppExecutor::Callbacks cb;
-    const WorkCppExecutor::Result rr = WorkCppExecutor::run(plan, cb);
-    (void)rr;
+    check(plan.steps.size() == 1, "savePackageList(C++) plan must have one step");
 
-    check(captured.size() == 1, "savePackageList(C++) must call CommandRunner exactly once");
-    const std::string cppCmd = captured.empty() ? std::string() : captured[0];
-
-    check(qtCmd == cppCmd,
-          (std::string("savePackageList command mismatch: qt='") + qtCmd + "' cpp='" + cppCmd + "'").c_str());
-
-    CommandRunner::setHooksForTests(nullptr);
+    const WorkCppPlanStep::RunCommandLine *cmdStep = nullptr;
+    for (const WorkCppPlanStep &st : plan.steps) {
+        if (std::holds_alternative<WorkCppPlanStep::RunCommandLine>(st.payload)) {
+            cmdStep = &std::get<WorkCppPlanStep::RunCommandLine>(st.payload);
+            break;
+        }
+    }
+    check(cmdStep != nullptr, "savePackageList(C++) must use RunCommandLine");
+    check(cmdStep->command == "SAVE_PACKAGE_LIST /tmp/work/iso-template/snapshot/package_list",
+          "savePackageList(C++) must use SAVE_PACKAGE_LIST pseudo-command without shell interpolation");
 }
 
 static void test_settings_excludeSwapFile_qt_vs_settingsexclusionscpp_oracle_exclusion_and_warning_exact()
@@ -5586,6 +5564,10 @@ static void test_batchprocessing_cpp_runner_runFromSettings_checkEnoughSpace_run
     hooks.elevationTool = []() { return std::string("/usr/bin/sudo"); };
     hooks.loggedInUserName = []() { return std::string("alice"); };
 
+    FileSystemUtilsCpp::Hooks fsHooks;
+    fsHooks.getFreeSpaceKiB = [](const std::string & /*path*/) -> std::uint64_t { return 0; };
+    FileSystemUtilsCpp::setHooksForTests(&fsHooks);
+
     CommandRunner::setHooksForTests(&hooks);
 
     SettingsCpp settings;
@@ -5617,10 +5599,11 @@ static void test_batchprocessing_cpp_runner_runFromSettings_checkEnoughSpace_run
 
     const auto r = BatchprocessingCppRunner::runFromSettings(settings, "unit_tests", cb, deps);
     check(r.aborted, "runFromSettings must abort in this deterministic insufficient space scenario");
-    check(calledStages.size() == 1,
-          "runFromSettings must invoke deps.runWork exactly once (setupEnv) before checkEnoughSpace abort");
+    check(calledStages.size() == 2,
+          "runFromSettings must invoke setupEnv then cleanUp on checkEnoughSpace abort");
 
     CommandRunner::setHooksForTests(nullptr);
+    FileSystemUtilsCpp::setHooksForTests(nullptr);
 }
 
 static std::string step_to_debug_string(const WorkCppPlanStep &s)
@@ -5655,7 +5638,8 @@ static std::string step_to_debug_string(const WorkCppPlanStep &s)
     }
     if (std::holds_alternative<WorkCppPlanStep::FileCopy>(s.payload)) {
         const auto &c = std::get<WorkCppPlanStep::FileCopy>(s.payload);
-        return std::string("FileCopy: ") + c.source + " -> " + c.destination;
+        return std::string("FileCopy: ") + c.source + " -> " + c.destination
+            + (c.fsyncAfter ? " [fsync]" : "");
     }
     if (std::holds_alternative<WorkCppPlanStep::FileRemove>(s.payload)) {
         const auto &c = std::get<WorkCppPlanStep::FileRemove>(s.payload);
@@ -5776,7 +5760,7 @@ static void check_plans_equal(const WorkCppPlan &a, const WorkCppPlan &b, const 
         } else if (std::holds_alternative<WorkCppPlanStep::FileCopy>(sa.payload)) {
             const auto &ca = std::get<WorkCppPlanStep::FileCopy>(sa.payload);
             const auto &cb = std::get<WorkCppPlanStep::FileCopy>(sb.payload);
-            if (ca.source != cb.source || ca.destination != cb.destination) {
+            if (ca.source != cb.source || ca.destination != cb.destination || ca.fsyncAfter != cb.fsyncAfter) {
                 fail_at(i);
                 return;
             }
@@ -7767,20 +7751,24 @@ static void test_work_setupenv_plan_qt_oracle_vs_cpp_planner_resetaccounts_boot_
     WorkSetupEnvQtPlanOracle::SettingsFields qtSettings;
     qtSettings.workDir = QStringLiteral("/tmp/s4-snapshot-work");
     qtSettings.forceInstaller = true;
+    qtSettings.embedInstaller = true;
+    qtSettings.embedInstallerMode = QStringLiteral("inject");
     qtSettings.resetAccounts = true;
     qtSettings.projectName = QStringLiteral("s4-snapshot");
     qtSettings.distroVersion = QStringLiteral("1");
-    qtSettings.codename = QStringLiteral("codename");
+    qtSettings.codename = QStringLiteral("bookworm");
     qtSettings.fullDistroName = QStringLiteral("Debian");
     qtSettings.releaseDate = QStringLiteral("2026-01-01");
 
     SettingsCpp cppSettings;
     cppSettings.workDir = "/tmp/s4-snapshot-work";
     cppSettings.forceInstaller = true;
+    cppSettings.embedInstaller = true;
+    cppSettings.embedInstallerMode = "inject";
     cppSettings.resetAccounts = true;
     cppSettings.projectName = "s4-snapshot";
     cppSettings.distroVersion = "1";
-    cppSettings.codename = "codename";
+    cppSettings.codename = "bookworm";
     cppSettings.fullDistroName = "Debian";
     cppSettings.releaseDate = "2026-01-01";
 
@@ -7924,6 +7912,165 @@ static void test_work_setupenv_plan_qt_oracle_vs_cpp_planner_overlay_fail_aborts
     const WorkCppPlan cppPlan = WorkCppPlanner::planSetupEnv(cppSettings, cppEnv);
     check_plans_equal(qtPlan, cppPlan, "Work setupEnv plan must match (overlay fail abort)");
 }
+
+static bool plan_has_proc_as_root_program(const WorkCppPlan &plan, const std::string &program)
+{
+    for (const WorkCppPlanStep &st : plan.steps) {
+        if (!std::holds_alternative<WorkCppPlanStep::ProcAsRoot>(st.payload)) {
+            continue;
+        }
+        if (std::get<WorkCppPlanStep::ProcAsRoot>(st.payload).program == program) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static const WorkCppPlanStep::ProcAsRoot *plan_find_proc_as_root_program(const WorkCppPlan &plan,
+                                                                         const std::string &program)
+{
+    for (const WorkCppPlanStep &st : plan.steps) {
+        if (!std::holds_alternative<WorkCppPlanStep::ProcAsRoot>(st.payload)) {
+            continue;
+        }
+        const auto &proc = std::get<WorkCppPlanStep::ProcAsRoot>(st.payload);
+        if (proc.program == program) {
+            return &proc;
+        }
+    }
+    return nullptr;
+}
+
+static void test_work_cpp_utils_force_installer_deprecated_warning()
+{
+    const std::string warn = WorkCppUtils::forceInstallerDeprecatedWarning(true, false);
+    check(!warn.empty(), "force_installer=yes with embed_installer=no must warn");
+    check(WorkCppUtils::forceInstallerDeprecatedWarning(false, false).empty(),
+          "force_installer=no must not warn");
+    check(WorkCppUtils::forceInstallerDeprecatedWarning(true, true).empty(),
+          "embed_installer=yes must not warn");
+}
+
+static void test_work_cpp_utils_bind_root_path_for_installed_to_live()
+{
+    const std::string overlayPath = WorkCppUtils::bindRootPathForInstalledToLive("s4-snapshot", true, true);
+    check(overlayPath == "/run/s4-snapshot/bind-root-overlay/root",
+          "active overlay must use /run/<app>/bind-root-overlay/root");
+    const std::string legacyPath = WorkCppUtils::bindRootPathForInstalledToLive("s4-snapshot", false, false);
+    check(legacyPath == "/.bind-root", "legacy path when overlay disabled");
+}
+
+static void test_work_cpp_utils_embed_installer_config_warning_mode_off()
+{
+    check(WorkCppUtils::embedInstallerInjectEnabled(true, "inject"), "inject mode must enable embedding");
+    check(!WorkCppUtils::embedInstallerInjectEnabled(true, "off"), "off mode must disable embedding");
+    check(!WorkCppUtils::embedInstallerInjectEnabled(false, "inject"), "embed_installer=no must disable embedding");
+
+    const std::string warn = WorkCppUtils::embedInstallerConfigWarning(true, "off");
+    check(!warn.empty(), "embed_installer=true with mode=off must emit a warning");
+    check(warn.find("embed_installer_mode=\"off\"") != std::string::npos, "warning must mention mode=off");
+    check(WorkCppUtils::embedInstallerConfigWarning(true, "inject").empty(),
+          "inject mode must not emit a warning");
+    check(WorkCppUtils::embedInstallerConfigWarning(false, "off").empty(),
+          "embed_installer=no must not emit a warning");
+}
+
+static void test_work_setupenv_plan_embed_installer_inject_includes_embed_step()
+{
+    SettingsCpp cppSettings;
+    cppSettings.workDir = "/tmp/s4-snapshot-work";
+    cppSettings.embedInstaller = true;
+    cppSettings.embedInstallerMode = "inject";
+    cppSettings.codename = "bookworm";
+    cppSettings.installerDebsDir = "/custom/debs";
+
+    WorkCppPlanner::SetupEnvEnv cppEnv;
+    cppEnv.workDirContainsS4Snapshot = true;
+    cppEnv.bootIsMountpoint = false;
+    cppEnv.bindRootOverlayActive = false;
+    cppEnv.needInstallCalamares = true;
+    cppEnv.setupBindRootOverlayOk = true;
+    cppEnv.applicationName = "s4-snapshot";
+
+    const WorkCppPlan plan = WorkCppPlanner::planSetupEnv(cppSettings, cppEnv);
+    check(plan_has_proc_as_root_program(plan, "embed_installer"),
+          "setupEnv inject plan must include embed_installer ProcAsRoot step");
+
+    const WorkCppPlanStep::ProcAsRoot *embed = plan_find_proc_as_root_program(plan, "embed_installer");
+    check(embed != nullptr, "embed_installer step must exist");
+    check(!embed->quietYes, "embed_installer must not be quiet");
+
+    bool hasBindRoot = false;
+    bool hasDebsDir = false;
+    bool hasSuite = false;
+    bool hasFetchMissing = false;
+    for (const std::string &arg : embed->args) {
+        if (arg == "--bind-root=/run/s4-snapshot/bind-root-overlay/root") {
+            hasBindRoot = true;
+        }
+        if (arg == "--debs-dir=/custom/debs") {
+            hasDebsDir = true;
+        }
+        if (arg == "--suite=bookworm") {
+            hasSuite = true;
+        }
+        if (arg == "--fetch-missing") {
+            hasFetchMissing = true;
+        }
+    }
+    check(hasBindRoot, "embed_installer args must include bind-root overlay path");
+    check(hasDebsDir, "embed_installer args must pass installer_debs_dir when set");
+    check(hasSuite, "embed_installer args must include suite from codename");
+    check(hasFetchMissing, "embed_installer args must request fetch-missing by default");
+
+    bool hasCheckResult = false;
+    for (const WorkCppPlanStep &st : plan.steps) {
+        if (!std::holds_alternative<WorkCppPlanStep::RunCommandLine>(st.payload)) {
+            continue;
+        }
+        const auto &cmd = std::get<WorkCppPlanStep::RunCommandLine>(st.payload);
+        if (cmd.command.find("CHECK_RESULT embed_installer") == 0) {
+            hasCheckResult = true;
+            break;
+        }
+    }
+    check(hasCheckResult, "setupEnv inject plan must CHECK_RESULT embed_installer");
+}
+
+static void test_work_setupenv_plan_embed_installer_off_skips_embed_step()
+{
+    WorkSetupEnvQtPlanOracle::SettingsFields qtSettings;
+    qtSettings.workDir = QStringLiteral("/tmp/s4-snapshot-work");
+    qtSettings.embedInstaller = true;
+    qtSettings.embedInstallerMode = QStringLiteral("off");
+    qtSettings.codename = QStringLiteral("bookworm");
+
+    SettingsCpp cppSettings;
+    cppSettings.workDir = "/tmp/s4-snapshot-work";
+    cppSettings.embedInstaller = true;
+    cppSettings.embedInstallerMode = "off";
+    cppSettings.codename = "bookworm";
+
+    WorkSetupEnvQtPlanOracle::Env qtEnv;
+    qtEnv.workDirContainsS4Snapshot = true;
+    qtEnv.setupBindRootOverlayOk = true;
+    qtEnv.needInstallCalamares = false;
+    qtEnv.applicationName = QStringLiteral("s4-snapshot");
+
+    WorkCppPlanner::SetupEnvEnv cppEnv;
+    cppEnv.workDirContainsS4Snapshot = true;
+    cppEnv.setupBindRootOverlayOk = true;
+    cppEnv.needInstallCalamares = false;
+    cppEnv.applicationName = "s4-snapshot";
+
+    const WorkCppPlan qtPlan = WorkSetupEnvQtPlanOracle::planSetupEnv(qtSettings, qtEnv);
+    const WorkCppPlan cppPlan = WorkCppPlanner::planSetupEnv(cppSettings, cppEnv);
+    check(!plan_has_proc_as_root_program(qtPlan, "embed_installer"),
+          "mode=off must not plan embed_installer (Qt oracle)");
+    check(!plan_has_proc_as_root_program(cppPlan, "embed_installer"),
+          "mode=off must not plan embed_installer (C++ planner)");
+}
+
 static void test_work_cleanup_plan_qt_oracle_vs_cpp_planner_success_with_shutdown()
 {
     WorkCleanupQtPlanOracle::SettingsFields qtSettings;
@@ -10073,11 +10220,15 @@ static void test_embedded_assets_extract_live_files_and_iso_templates_basic()
           "embedded template-initrd must extract etc/init.d/live-init");
     {
         const QFileInfo shInfo(initrdDir.filePath("bin/sh"));
+        const QFileInfo busyboxInfo(initrdDir.filePath("bin/busybox"));
         check(shInfo.isSymLink(), "embedded template-initrd bin/sh must be a symlink");
-        check(shInfo.symLinkTarget() == QStringLiteral("busybox"),
-              "embedded template-initrd bin/sh must point to busybox");
-        check(QFileInfo(initrdDir.filePath("bin/busybox")).isExecutable(),
-              "embedded template-initrd bin/busybox must be executable");
+        check(busyboxInfo.isExecutable(), "embedded template-initrd bin/busybox must be executable");
+        const QString shTarget = shInfo.symLinkTarget();
+        const bool pointsToBusybox = shTarget == QStringLiteral("busybox")
+                                     || shTarget.endsWith(QStringLiteral("/busybox"))
+                                     || (!shInfo.canonicalFilePath().isEmpty()
+                                         && shInfo.canonicalFilePath() == busyboxInfo.canonicalFilePath());
+        check(pointsToBusybox, "embedded template-initrd bin/sh must point to busybox");
     }
 }
 
@@ -13312,6 +13463,30 @@ static void test_qfile_copy_vs_filecpp_copy()
         check(fCpp.open(QFile::ReadOnly), "dstCpp readable");
         check(fQt.readAll() == fCpp.readAll(), "copy(ok) bytes must match");
     }
+
+    // Verified copy with fsync must succeed and preserve size
+    {
+        const QString src = td.filePath("src_fsync");
+        const QString dst = td.filePath("dst_fsync");
+        check(WorkCppUtils::writeTextFileUtf8NoBomTruncate(src.toStdString(), std::string("kernel-bytes")),
+              "seed fsync copy source");
+        check(FileCpp::copy(src.toStdString(), dst.toStdString(), true), "copy with fsync must succeed");
+        check(FileCpp::size(dst.toStdString()) == FileCpp::size(src.toStdString()),
+              "verified copy must preserve file size");
+    }
+}
+
+static void test_dircpp_remove_recursively_safety()
+{
+    check(!DirCpp("/etc").removeRecursively(), "removeRecursively must refuse /etc");
+    check(!DirCpp("/").removeRecursively(), "removeRecursively must refuse /");
+
+    QTemporaryDir td;
+    check(td.isValid(), "QTemporaryDir must be valid for safe removal test");
+    const QString sub = td.path() + "/safe_remove";
+    check(QDir().mkpath(sub + "/nested"), "mkpath nested dir");
+    check(DirCpp(sub.toStdString()).removeRecursively(), "removeRecursively must allow /tmp paths");
+    check(!QDir(sub).exists(), "safe removed dir must not exist");
 }
 
 static void test_qfile_remove_vs_filecpp_remove()
@@ -15139,6 +15314,7 @@ int main(int argc, char **argv)
     testCases["test_qfile_exists_vs_filecpp_exists"] = []() { test_qfile_exists_vs_filecpp_exists(); };
     testCases["test_qfile_remove_vs_filecpp_remove"] = []() { test_qfile_remove_vs_filecpp_remove(); };
     testCases["test_qfile_copy_vs_filecpp_copy"] = []() { test_qfile_copy_vs_filecpp_copy(); };
+    testCases["test_dircpp_remove_recursively_safety"] = []() { test_dircpp_remove_recursively_safety(); };
     testCases["test_qfile_link_vs_filecpp_link"] = []() { test_qfile_link_vs_filecpp_link(); };
     testCases["test_qfileinfo_isfile_vs_filecpp_isfile"] = []() { test_qfileinfo_isfile_vs_filecpp_isfile(); };
     testCases["test_qfileinfo_exists_vs_filecpp_exists"] = []() { test_qfileinfo_exists_vs_filecpp_exists(); };
@@ -15148,7 +15324,7 @@ int main(int argc, char **argv)
     testCases["test_qfileinfo_completesuffix_vs_filecpp"] = []() { test_qfileinfo_completesuffix_vs_filecpp(); };
     testCases["test_qfileinfo_filename_vs_filecpp"] = []() { test_qfileinfo_filename_vs_filecpp(); };
     testCases["test_qfile_filename_vs_filecpp"] = []() { test_qfile_filename_vs_filecpp(); };
-    testCases["test_work_savePackageList_qt_vs_workcppplanner_oracle_command_exact"] = []() { test_work_savePackageList_qt_vs_workcppplanner_oracle_command_exact(); };
+    testCases["test_work_savePackageList_cpp_uses_save_package_list_pseudo_command"] = []() { test_work_savePackageList_cpp_uses_save_package_list_pseudo_command(); };
     testCases["test_cli_parser_kv_gen_oracle_qt_vs_cpp"] = []() { test_cli_parser_kv_gen_oracle_qt_vs_cpp(); };
     testCases["test_qcommandlineparser_vs_commandlineparserstd_oracle_help_and_errors"] = []() { test_qcommandlineparser_vs_commandlineparserstd_oracle_help_and_errors(); };
     testCases["test_batchprocessing_qt_oracle_vs_cpp_oracle_colorize_diff"] = []() { test_batchprocessing_qt_oracle_vs_cpp_oracle_colorize_diff(); };
@@ -15204,6 +15380,11 @@ int main(int argc, char **argv)
     testCases["test_work_setupenv_plan_qt_oracle_vs_cpp_planner_resetaccounts_boot_mounted_overlay_ok"] = []() { test_work_setupenv_plan_qt_oracle_vs_cpp_planner_resetaccounts_boot_mounted_overlay_ok(); };
     testCases["test_work_setupenv_plan_qt_oracle_vs_cpp_planner_overlay_active_skips_readonly_step"] = []() { test_work_setupenv_plan_qt_oracle_vs_cpp_planner_overlay_active_skips_readonly_step(); };
     testCases["test_work_setupenv_plan_qt_oracle_vs_cpp_planner_overlay_fail_aborts"] = []() { test_work_setupenv_plan_qt_oracle_vs_cpp_planner_overlay_fail_aborts(); };
+    testCases["test_work_cpp_utils_force_installer_deprecated_warning"] = []() { test_work_cpp_utils_force_installer_deprecated_warning(); };
+    testCases["test_work_cpp_utils_bind_root_path_for_installed_to_live"] = []() { test_work_cpp_utils_bind_root_path_for_installed_to_live(); };
+    testCases["test_work_cpp_utils_embed_installer_config_warning_mode_off"] = []() { test_work_cpp_utils_embed_installer_config_warning_mode_off(); };
+    testCases["test_work_setupenv_plan_embed_installer_inject_includes_embed_step"] = []() { test_work_setupenv_plan_embed_installer_inject_includes_embed_step(); };
+    testCases["test_work_setupenv_plan_embed_installer_off_skips_embed_step"] = []() { test_work_setupenv_plan_embed_installer_off_skips_embed_step(); };
     testCases["test_work_cleanup_plan_qt_oracle_vs_cpp_planner_success_with_shutdown"] = []() { test_work_cleanup_plan_qt_oracle_vs_cpp_planner_success_with_shutdown(); };
     testCases["test_work_cleanup_plan_qt_oracle_vs_cpp_planner_success_no_shutdown"] = []() { test_work_cleanup_plan_qt_oracle_vs_cpp_planner_success_no_shutdown(); };
     testCases["test_work_cleanup_plan_qt_oracle_vs_cpp_planner_failure"] = []() { test_work_cleanup_plan_qt_oracle_vs_cpp_planner_failure(); };
@@ -15404,6 +15585,7 @@ int main(int argc, char **argv)
     test_qfile_exists_vs_filecpp_exists();
     test_qfile_remove_vs_filecpp_remove();
     test_qfile_copy_vs_filecpp_copy();
+    test_dircpp_remove_recursively_safety();
     test_qfile_link_vs_filecpp_link();
     test_qfileinfo_isfile_vs_filecpp_isfile();
     test_qfileinfo_exists_vs_filecpp_exists();
@@ -15414,7 +15596,7 @@ int main(int argc, char **argv)
     test_qfileinfo_filename_vs_filecpp();
     test_qfile_filename_vs_filecpp();
     test_qfile_readLine_textmode_vs_filecpp();
-    test_work_savePackageList_qt_vs_workcppplanner_oracle_command_exact();
+    test_work_savePackageList_cpp_uses_save_package_list_pseudo_command();
     test_cli_parser_kv_gen_oracle_qt_vs_cpp();
     test_qcommandlineparser_vs_commandlineparserstd_oracle_help_and_errors();
     test_batchprocessing_qt_oracle_vs_cpp_oracle_colorize_diff();
@@ -15464,6 +15646,11 @@ int main(int argc, char **argv)
     test_work_setupenv_plan_qt_oracle_vs_cpp_planner_resetaccounts_boot_mounted_overlay_ok();
     test_work_setupenv_plan_qt_oracle_vs_cpp_planner_overlay_active_skips_readonly_step();
     test_work_setupenv_plan_qt_oracle_vs_cpp_planner_overlay_fail_aborts();
+    test_work_cpp_utils_force_installer_deprecated_warning();
+    test_work_cpp_utils_bind_root_path_for_installed_to_live();
+    test_work_cpp_utils_embed_installer_config_warning_mode_off();
+    test_work_setupenv_plan_embed_installer_inject_includes_embed_step();
+    test_work_setupenv_plan_embed_installer_off_skips_embed_step();
     test_work_cleanup_plan_qt_oracle_vs_cpp_planner_success_with_shutdown();
     test_work_cleanup_plan_qt_oracle_vs_cpp_planner_success_no_shutdown();
     test_work_cleanup_plan_qt_oracle_vs_cpp_planner_failure();

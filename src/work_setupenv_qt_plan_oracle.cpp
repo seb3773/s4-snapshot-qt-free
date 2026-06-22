@@ -117,12 +117,10 @@ WorkCppPlan WorkSetupEnvQtPlanOracle::planSetupEnv(const SettingsFields &setting
 {
     WorkCppPlan p;
 
-    const QString bindRootPathForInstalledToLive = env.bindRootOverlayActive
-                                                       ? QStringLiteral("/.bind-root")
-                                                       : (env.setupBindRootOverlayOk
-                                                              ? (QStringLiteral("/run/") + env.applicationName
-                                                                 + QStringLiteral("/bind-root-overlay/root"))
-                                                              : QStringLiteral("/.bind-root"));
+    const QString bindRootPathForInstalledToLive = QString::fromStdString(
+        WorkCppUtils::bindRootPathForInstalledToLive(env.applicationName.toStdString(),
+                                                     env.bindRootOverlayActive,
+                                                     env.setupBindRootOverlayOk));
 
     if (!env.workDirContainsS4Snapshot) {
         plan_abort(p, "Work dir does not look safe");
@@ -136,10 +134,6 @@ WorkCppPlan WorkSetupEnvQtPlanOracle::planSetupEnv(const SettingsFields &setting
     if (env.bootIsMountpoint) {
         bind_boot = QStringLiteral("bind=/boot ");
         bind_boot_too = QStringLiteral(",/boot");
-    }
-
-    if (settings.forceInstaller && env.needInstallCalamares) {
-        plan_run_cmd(p, "INSTALL_PACKAGE calamares-settings-debian", false);
     }
 
     // writeSnapshotInfo()
@@ -186,15 +180,22 @@ WorkCppPlan WorkSetupEnvQtPlanOracle::planSetupEnv(const SettingsFields &setting
                         bindRoot.toStdString()},
                        true);
 
+        plan_proc_root(p, "mountpoint", {"-q", bindRoot.toStdString()}, true);
         if (env.setupBindRootOverlay_bindRootIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", bindRoot.toStdString()}, true);
         }
 
+        plan_proc_root(p, "mountpoint", {"-q", lowerDir.toStdString()}, true);
         if (env.setupBindRootOverlay_lowerIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", lowerDir.toStdString()}, true);
         }
 
         plan_proc_root(p, "mount", {"--bind", "/", lowerDir.toStdString()}, true);
+        if (env.setupBindRootOverlay_bindMountOk) {
+            plan_run_cmd(p,
+                         "CHECK_RESULT overlay_bind_mount else ERROR: Could not prepare a safe bind-root overlay (bind mount).",
+                         true);
+        }
         if (!env.setupBindRootOverlay_bindMountOk) {
             plan_message_box(p,
                              BoxType::critical,
@@ -211,6 +212,25 @@ WorkCppPlan WorkSetupEnvQtPlanOracle::planSetupEnv(const SettingsFields &setting
                        "mount",
                        {"-t", "overlay", "overlay", "-o", overlayOptions.toStdString(), bindRoot.toStdString()},
                        true);
+        if (env.setupBindRootOverlay_overlayMountOk) {
+            plan_run_cmd(p,
+                         "CHECK_RESULT overlay_mount else ERROR: Could not prepare a safe bind-root overlay (overlay mount).",
+                         true);
+            plan_run_cmd(p,
+                         std::string("test -d ")
+                             + WorkCppUtils::shellQuoteSingleQuoted((bindRoot + QStringLiteral("/etc")).toStdString()),
+                         false);
+            plan_run_cmd(p,
+                         "CHECK_RESULT else ERROR: Bind-root overlay /etc is not accessible.",
+                         true);
+            plan_run_cmd(p,
+                         std::string("test -f ")
+                             + WorkCppUtils::shellQuoteSingleQuoted((bindRoot + QStringLiteral("/etc/passwd")).toStdString()),
+                         false);
+            plan_run_cmd(p,
+                         "CHECK_RESULT else ERROR: Bind-root overlay /etc/passwd is not accessible.",
+                         true);
+        }
         if (!env.setupBindRootOverlay_overlayMountOk) {
             plan_proc_root(p, "umount", {"--recursive", lowerDir.toStdString()}, true);
             plan_message_box(p,
@@ -281,8 +301,27 @@ WorkCppPlan WorkSetupEnvQtPlanOracle::planSetupEnv(const SettingsFields &setting
                      true);
     }
 
+    if (env.needInstallCalamares) {
+        const QString bindRoot = bindRootPathForInstalledToLive;
+        std::vector<std::string> embedArgs;
+        embedArgs.push_back((QStringLiteral("--bind-root=") + bindRoot).toStdString());
+        if (!settings.installerDebsDir.isEmpty()) {
+            embedArgs.push_back((QStringLiteral("--debs-dir=") + settings.installerDebsDir).toStdString());
+        }
+        const QString suite = settings.codename.isEmpty() ? QStringLiteral("bookworm") : settings.codename;
+        embedArgs.push_back((QStringLiteral("--suite=") + suite).toStdString());
+        embedArgs.push_back("--fetch-missing");
+        plan_proc_root(p, "embed_installer", embedArgs, false);
+        plan_run_cmd(p,
+                     "CHECK_RESULT embed_installer else ERROR: Could not embed installer into snapshot.",
+                     true);
+    }
+
     if (!env.bindRootOverlayActive && !env.setupBindRootOverlayOk) {
-        plan_proc_root(p, "installed-to-live", {"-b", "/.bind-root", "read-only"}, true);
+        plan_proc_root(p,
+                       "installed-to-live",
+                       {"-b", bindRootPathForInstalledToLive.toStdString(), "read-only"},
+                       true);
     }
 
     return p;

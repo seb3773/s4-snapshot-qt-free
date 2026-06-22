@@ -108,7 +108,9 @@ if [ -f "/var/lib/mxdebian/.mxsnapshot_accounts_reset.stp" ] ; then
   cat > "/etc/calamares/modules/removeuser.conf" <<EOF
 username: $FRSTUSER
 EOF
-  sed -i '/ - unpackfs/a\  - removeuser' /etc/calamares/settings.conf #add line after unpackfs
+  if [ -f /etc/calamares/settings.conf ] && ! grep -qE '^[[:space:]]*-[[:space:]]+removeuser[[:space:]]*$' /etc/calamares/settings.conf; then
+    sed -i '/ - unpackfs/a\  - removeuser' /etc/calamares/settings.conf
+  fi
 else
   #don't proceed a user+keyboard+locale+displaymanager
   sed -i '/ - users/d' /etc/calamares/settings.conf

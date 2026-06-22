@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install Snapshot
+Comment=Install this live snapshot to disk
+Exec=/usr/share/s4-snapshot/scripts/install-snapshot.sh
+Icon=calamares
+Categories=System;
+Terminal=false
+StartupNotify=true

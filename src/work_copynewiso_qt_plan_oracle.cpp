@@ -35,10 +35,13 @@ static void plan_proc_root(WorkCppPlan &p,
     p.steps.push_back(std::move(st));
 }
 
-static void plan_file_copy(WorkCppPlan &p, const std::string &source, const std::string &destination)
+static void plan_file_copy(WorkCppPlan &p,
+                           const std::string &source,
+                           const std::string &destination,
+                           bool fsyncAfter = false)
 {
     WorkCppPlanStep st;
-    st.payload = WorkCppPlanStep::FileCopy{source, destination};
+    st.payload = WorkCppPlanStep::FileCopy{source, destination, fsyncAfter};
     p.steps.push_back(std::move(st));
 }
 
@@ -95,10 +98,10 @@ WorkCppPlan WorkCopyNewIsoQtPlanOracle::planCopyNewIso(const SettingsFields &set
         } else {
             vmlinuzSource = QStringLiteral("/boot/vmlinuz-") + kernelVersion;
         }
-        plan_run_cmd(p,
-                     (QStringLiteral("cp \"") + vmlinuzSource + QStringLiteral("\" iso-template/antiX/vmlinuz"))
-                         .toStdString(),
-                     false);
+        plan_file_copy(p,
+                       vmlinuzSource.toStdString(),
+                       (settings.workDir + QStringLiteral("/iso-template/antiX/vmlinuz")).toStdString(),
+                       true);
         plan_run_cmd(p,
                      "CHECK_RESULT else ERROR: Could not copy kernel (vmlinuz) into ISO template.",
                      false);
@@ -159,6 +162,9 @@ WorkCppPlan WorkCopyNewIsoQtPlanOracle::planCopyNewIso(const SettingsFields &set
                   + QStringLiteral("\" -k=\"") + kernelVersion + QStringLiteral("\""))
                      .toStdString(),
                  false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not copy kernel modules into initrd.",
+                 false);
     plan_proc_root(p, "copy-initrd-programs", {"-e", "--to=" + path.toStdString()}, false);
     if (!env.loggedInUserName.isEmpty()) {
         plan_proc_root(p, "chown", {"-R", env.loggedInUserName.toStdString() + ":", path.toStdString()}, true);
@@ -168,6 +174,17 @@ WorkCppPlan WorkCopyNewIsoQtPlanOracle::planCopyNewIso(const SettingsFields &set
     plan_run_cmd(p,
                  (QStringLiteral("(find . |cpio -o -H newc --owner root:root |gzip -9) >\"") + settings.workDir
                   + QStringLiteral("/iso-template/antiX/initrd.gz\""))
+                     .toStdString(),
+                 false);
+    plan_run_cmd(p,
+                 (QStringLiteral("test -s \"") + settings.workDir + QStringLiteral("/iso-template/antiX/initrd.gz\""))
+                     .toStdString(),
+                 false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not build initrd.gz.",
+                 false);
+    plan_run_cmd(p,
+                 (QStringLiteral("FSYNC_FILE ") + settings.workDir + QStringLiteral("/iso-template/antiX/initrd.gz"))
                      .toStdString(),
                  false);
     plan_run_cmd(p,

@@ -64,12 +64,6 @@ case $(runlevel) in
     *unknown) exit 0  ;;
 esac
 
-# Set the final tsplash dot here if not starting X
-tsplash="/live/bin/tell-tsplash"
-if [ -x "$tsplash" -a -d /live/config/tsplash ]; then
-    $tsplash prepare-consoles
-fi
-
 (sleep 1 && chvt 2)&
 
 exit 0

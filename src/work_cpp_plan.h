@@ -39,6 +39,7 @@ struct WorkCppPlanStep
     struct FileCopy {
         std::string source;
         std::string destination;
+        bool fsyncAfter = false;
     };
 
     struct FileRemove {

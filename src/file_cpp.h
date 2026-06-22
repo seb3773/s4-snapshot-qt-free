@@ -50,7 +50,10 @@ public:
     [[nodiscard]] static bool exists(const std::string &fileName);
 
     [[nodiscard]] static bool remove(const std::string &fileName);
-    [[nodiscard]] static bool copy(const std::string &sourceFileName, const std::string &destFileName);
+    [[nodiscard]] static bool copy(const std::string &sourceFileName,
+                                   const std::string &destFileName,
+                                   bool fsyncData = false);
+    [[nodiscard]] static bool fsyncPath(const std::string &filePath);
     [[nodiscard]] static bool link(const std::string &sourceFileName, const std::string &linkName);
 
     [[nodiscard]] static bool isFile(const std::string &fileName);

@@ -497,6 +497,21 @@ bool WorkQtOracle::setupBindRootOverlay()
         }
     }
 
+    if (!runCommandLine(QString("test -d ")
+                        + QString::fromStdString(
+                            WorkCppUtils::shellQuoteSingleQuoted((bindRoot + "/etc").toStdString())))) {
+        qWarning() << "Bind-root overlay /etc is not accessible";
+        (void)procAsRoot("umount", {"--recursive", lowerDir}, nullptr, CommandRunner::QuietMode::Yes);
+        return false;
+    }
+    if (!runCommandLine(QString("test -f ")
+                        + QString::fromStdString(
+                            WorkCppUtils::shellQuoteSingleQuoted((bindRoot + "/etc/passwd").toStdString())))) {
+        qWarning() << "Bind-root overlay /etc/passwd is not accessible";
+        (void)procAsRoot("umount", {"--recursive", lowerDir}, nullptr, CommandRunner::QuietMode::Yes);
+        return false;
+    }
+
     bindRootPath = bindRoot;
     bindRootOverlayBase = overlayBase;
     bindRootOverlayActive = true;
@@ -846,16 +861,20 @@ void WorkQtOracle::setupEnv()
         cleanUp();
     }
 
+    {
+        const std::string embedWarn = WorkCppUtils::embedInstallerConfigWarning(
+            settings->embedInstaller,
+            settings->embedInstallerMode.toStdString());
+        if (!embedWarn.empty()) {
+            emit message(QString::fromStdString(embedWarn));
+        }
+    }
+
     QString bind_boot;
     QString bind_boot_too;
     if (runCommandLine("mountpoint /boot")) {
         bind_boot = "bind=/boot ";
         bind_boot_too = ",/boot";
-    }
-
-    // Install installer if absent
-    if (settings->forceInstaller && !checkInstalled("calamares-settings-debian")) {
-        installPackage("calamares-settings-debian");
     }
 
     writeSnapshotInfo();
@@ -900,10 +919,26 @@ void WorkQtOracle::setupEnv()
             }
         }
     }
+    if (settings->embedInstaller && settings->embedInstallerMode == QLatin1String("inject")) {
+        QStringList embedArgs;
+        embedArgs << QStringLiteral("--bind-root=") + bindRootPath;
+        if (!settings->installerDebsDir.isEmpty()) {
+            embedArgs << QStringLiteral("--debs-dir=") + settings->installerDebsDir;
+        }
+        const QString suite = settings->codename.isEmpty() ? QStringLiteral("bookworm") : settings->codename;
+        embedArgs << QStringLiteral("--suite=") + suite;
+        embedArgs << QStringLiteral("--fetch-missing");
+
+        const CommandRunner::Result embedResult = procAsRoot("embed_installer", embedArgs, nullptr, CommandRunner::QuietMode::No);
+        if (!(embedResult.started && embedResult.normalExit && embedResult.exitCode == 0)) {
+            emit messageBox(BoxType::critical, tr("Error"), tr("Could not embed installer into snapshot."));
+            cleanUp();
+        }
+    }
+
     if (!bindRootOverlayActive) {
         (void)procAsRoot("installed-to-live", {"-b", bindRootPath, "read-only"}, nullptr, CommandRunner::QuietMode::Yes);
     }
-    //shell.runAsRoot("dash /usr/share/s4-snapshot/scripts/configure_debian_calamares.sh"); //configure calamares for use with s4 snapshot
 }
 
 void WorkQtOracle::writeLsbRelease()

@@ -157,20 +157,32 @@ WorkCppPlan WorkCreateIsoQtPlanOracle::planCreateIso(const SettingsFields &setti
     }
 
     plan_run_cmd(p,
+                 std::string("test -s ")
+                     + WorkCppUtils::shellQuoteSingleQuoted(
+                         (settings.workDir + QStringLiteral("/iso-template/antiX/linuxfs")).toStdString()),
+                 false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not create linuxfs file, please check /var/log/s4-snapshot.log",
+                 false);
+    plan_run_cmd(p,
                  std::string("WRITE_LINUXFS_INFO_FROM_MKSQUASHFS_OUTPUT ")
                      + (settings.workDir + QStringLiteral("/iso-template/antiX/linuxfs.info")).toStdString(),
                  true);
 
     plan_mkpath(p, std::string("iso-2/antiX"));
     plan_run_cmd(p, std::string("mv iso-template/antiX/linuxfs* iso-2/antiX"), false);
+    plan_run_cmd(p,
+                 "CHECK_RESULT else ERROR: Could not move linuxfs into iso-2.",
+                 false);
 
     // md5 linuxfs
     plan_message(p, QObject::tr("Calculating checksum...").toStdString());
     plan_run_cmd(p, std::string("sync"), false);
     plan_chdir(p, (settings.workDir + QStringLiteral("/iso-2/antiX")).toStdString());
     plan_run_cmd(p,
-                 std::string("md5sum \"") + "linuxfs" + "\">\"" + (settings.workDir + QStringLiteral("/iso-2/antiX")).toStdString()
-                     + "/linuxfs.md5\"",
+                 std::string("md5sum ") + WorkCppUtils::shellQuoteSingleQuoted("linuxfs") + " > "
+                     + WorkCppUtils::shellQuoteSingleQuoted(
+                         (settings.workDir + QStringLiteral("/iso-2/antiX/linuxfs.md5")).toStdString()),
                  false);
     plan_chdir(p, settings.workDir.toStdString());
 
@@ -178,26 +190,41 @@ WorkCppPlan WorkCreateIsoQtPlanOracle::planCreateIso(const SettingsFields &setti
 
     plan_chdir(p, (settings.workDir + QStringLiteral("/iso-template")).toStdString());
 
-    QString xorrisoCmd =
-        QStringLiteral("xorriso -as mkisofs -l -V DEBIANLIVE -R -J -pad -iso-level 3 -no-emul-boot -boot-load-size 4 -boot-info-table "
-                       "-b boot/isolinux/isolinux.bin -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -c "
-                       "boot/isolinux/isolinux.cat -o \"")
-        + settings.snapshotDir + QStringLiteral("/") + filename
-        + QStringLiteral("\" . \"") + settings.workDir + QStringLiteral("/iso-2\"");
+    const std::string isoFinalPath = (settings.snapshotDir + QStringLiteral("/") + filename).toStdString();
+    const std::string isoTempPath = isoFinalPath + ".tmp.$$";
+    const std::string iso2Dir = (settings.workDir + QStringLiteral("/iso-2")).toStdString();
+
+    plan_run_cmd(p, std::string("rm -f ") + WorkCppUtils::shellQuoteSingleQuoted(isoTempPath), true);
+
+    std::string xorrisoCmd =
+        "xorriso -as mkisofs -l -V DEBIANLIVE -R -J -pad -iso-level 3 -no-emul-boot -boot-load-size 4 -boot-info-table "
+        "-b boot/isolinux/isolinux.bin -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -c "
+        "boot/isolinux/isolinux.cat -o "
+        + WorkCppUtils::shellQuoteSingleQuoted(isoTempPath) + " . "
+        + WorkCppUtils::shellQuoteSingleQuoted(iso2Dir);
 
     if (env.umaskOut.trimmed() != QStringLiteral("0022")) {
-        xorrisoCmd = QStringLiteral("umask 022; ") + xorrisoCmd;
+        xorrisoCmd = "umask 022; " + xorrisoCmd;
     }
 
     plan_message(p, QObject::tr("Creating CD/DVD image file...").toStdString());
-    plan_run_cmd(p, xorrisoCmd.toStdString(), false);
+    plan_run_cmd(p, xorrisoCmd, false);
     plan_run_cmd(p, "CHECK_RESULT else ERROR: Could not create ISO file, please check whether you have enough space on the destination partition.", false);
+    plan_run_cmd(p,
+                 std::string("mv -f ") + WorkCppUtils::shellQuoteSingleQuoted(isoTempPath) + " "
+                     + WorkCppUtils::shellQuoteSingleQuoted(isoFinalPath),
+                 false);
+    plan_run_cmd(p, "CHECK_RESULT else ERROR: Could not finalize ISO file.", false);
+    plan_run_cmd(p, std::string("FSYNC_FILE ") + isoFinalPath, false);
 
     if (settings.makeIsohybrid) {
         plan_message(p, QObject::tr("Making hybrid iso").toStdString());
         plan_run_cmd(p,
-                     (QStringLiteral("isohybrid --uefi \"") + settings.snapshotDir + QStringLiteral("/") + filename
-                      + QStringLiteral("\"")).toStdString(),
+                     std::string("isohybrid --uefi ")
+                         + WorkCppUtils::shellQuoteSingleQuoted(isoFinalPath),
+                     false);
+        plan_run_cmd(p,
+                     "CHECK_RESULT else ERROR: Could not make the ISO bootable as a hybrid image.",
                      false);
     }
 
@@ -206,8 +233,9 @@ WorkCppPlan WorkCreateIsoQtPlanOracle::planCreateIso(const SettingsFields &setti
         plan_run_cmd(p, std::string("sync"), false);
         plan_chdir(p, settings.snapshotDir.toStdString());
         plan_run_cmd(p,
-                     (QStringLiteral("md5sum \"") + filename + QStringLiteral("\">\"") + settings.snapshotDir
-                      + QStringLiteral("/") + filename + QStringLiteral(".md5\"")).toStdString(),
+                     std::string("md5sum ") + WorkCppUtils::shellQuoteSingleQuoted(filename.toStdString()) + " > "
+                         + WorkCppUtils::shellQuoteSingleQuoted(
+                             (settings.snapshotDir + QStringLiteral("/") + filename + QStringLiteral(".md5")).toStdString()),
                      false);
         plan_chdir(p, settings.workDir.toStdString());
     }
@@ -217,8 +245,10 @@ WorkCppPlan WorkCreateIsoQtPlanOracle::planCreateIso(const SettingsFields &setti
         plan_run_cmd(p, std::string("sync"), false);
         plan_chdir(p, settings.snapshotDir.toStdString());
         plan_run_cmd(p,
-                     (QStringLiteral("sha512sum \"") + filename + QStringLiteral("\">\"") + settings.snapshotDir
-                      + QStringLiteral("/") + filename + QStringLiteral(".sha512\"")).toStdString(),
+                     std::string("sha512sum ") + WorkCppUtils::shellQuoteSingleQuoted(filename.toStdString()) + " > "
+                         + WorkCppUtils::shellQuoteSingleQuoted(
+                             (settings.snapshotDir + QStringLiteral("/") + filename + QStringLiteral(".sha512"))
+                                 .toStdString()),
                      false);
         plan_chdir(p, settings.workDir.toStdString());
     }

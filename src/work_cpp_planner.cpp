@@ -113,10 +113,13 @@ static void plan_process_execute(WorkCppPlan &p, const std::string &program, con
     p.steps.push_back(std::move(st));
 }
 
-static void plan_file_copy(WorkCppPlan &p, const std::string &source, const std::string &destination)
+static void plan_file_copy(WorkCppPlan &p,
+                           const std::string &source,
+                           const std::string &destination,
+                           bool fsyncAfter = false)
 {
     WorkCppPlanStep st;
-    st.payload = WorkCppPlanStep::FileCopy{source, destination};
+    st.payload = WorkCppPlanStep::FileCopy{source, destination, fsyncAfter};
     p.steps.push_back(std::move(st));
 }
 
@@ -256,8 +259,7 @@ WorkCppPlan WorkCppPlanner::planSavePackageList(const SettingsCpp &settings, con
 
     const std::string base = FileCpp::completeBaseName(fileName);
     const std::string fullName = settings.workDir + "/iso-template/" + base + "/package_list";
-    const std::string cmd = std::string(R"(dpkg -l | awk '/^ii /{printf "%-41s %s\n", $2, $3}' > ')") + fullName
-        + "'";
+    const std::string cmd = std::string("SAVE_PACKAGE_LIST ") + fullName;
 
     WorkCppPlanStep st;
     st.payload = WorkCppPlanStep::RunCommandLine{cmd, false};
@@ -269,9 +271,12 @@ WorkCppPlan WorkCppPlanner::planEditBootMenu(const SettingsCpp &settings, const 
 {
     WorkCppPlan p;
 
-    const std::string cmd = editorCmd + " \"" + settings.workDir + "/iso-template/boot/grub/grub.cfg\" \""
-        + settings.workDir + "/iso-template/boot/syslinux/syslinux.cfg\" \"" + settings.workDir
-        + "/iso-template/boot/isolinux/isolinux.cfg\"";
+    const std::string grubCfg = settings.workDir + "/iso-template/boot/grub/grub.cfg";
+    const std::string syslinuxCfg = settings.workDir + "/iso-template/boot/syslinux/syslinux.cfg";
+    const std::string isolinuxCfg = settings.workDir + "/iso-template/boot/isolinux/isolinux.cfg";
+    const std::string cmd = editorCmd + " " + WorkCppUtils::shellQuoteSingleQuoted(grubCfg) + " "
+        + WorkCppUtils::shellQuoteSingleQuoted(syslinuxCfg) + " "
+        + WorkCppUtils::shellQuoteSingleQuoted(isolinuxCfg);
 
     WorkCppPlanStep st;
     st.payload = WorkCppPlanStep::RunCommandLine{cmd, false};
@@ -331,7 +336,7 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
     plan_message(p, "Squashing filesystem...");
     plan_proc_root(p, wrapperCommand, wrapperArgs, false);
     plan_run_cmd(p,
-                 std::string("test -s \"") + settings.workDir + "/iso-template/antiX/linuxfs\"",
+                 std::string("test -s ") + WorkCppUtils::shellQuoteSingleQuoted(settings.workDir + "/iso-template/antiX/linuxfs"),
                  false);
     plan_run_cmd(p,
                  "CHECK_RESULT else ERROR: Could not create linuxfs file, please check /var/log/s4-snapshot.log",
@@ -355,8 +360,8 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
     plan_run_cmd(p, "sync", false);
     plan_chdir(p, settings.workDir + "/iso-2/antiX");
     plan_run_cmd(p,
-                 std::string("md5sum \"") + "linuxfs" + "\">\"" + (settings.workDir + "/iso-2/antiX")
-                     + "/linuxfs.md5\"",
+                 std::string("md5sum ") + WorkCppUtils::shellQuoteSingleQuoted("linuxfs") + " > "
+                     + WorkCppUtils::shellQuoteSingleQuoted(settings.workDir + "/iso-2/antiX/linuxfs.md5"),
                  false);
     plan_chdir(p, settings.workDir);
 
@@ -365,13 +370,17 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
 
     // --- xorriso stage
     plan_chdir(p, settings.workDir + "/iso-template");
+    const std::string isoFinalPath = settings.snapshotDir + "/" + filename;
+    const std::string isoTempPath = isoFinalPath + ".tmp.$$";
+
+    plan_run_cmd(p, std::string("rm -f ") + WorkCppUtils::shellQuoteSingleQuoted(isoTempPath), true);
+
     std::string xorrisoCmd =
         "xorriso -as mkisofs -l -V DEBIANLIVE -R -J -pad -iso-level 3 -no-emul-boot -boot-load-size 4 -boot-info-table "
         "-b boot/isolinux/isolinux.bin -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -c "
-        "boot/isolinux/isolinux.cat -o \"";
-    xorrisoCmd += settings.snapshotDir + "/" + filename;
-    xorrisoCmd += "\" . \"";
-    xorrisoCmd += settings.workDir + "/iso-2\"";
+        "boot/isolinux/isolinux.cat -o "
+        + WorkCppUtils::shellQuoteSingleQuoted(isoTempPath) + " . "
+        + WorkCppUtils::shellQuoteSingleQuoted(settings.workDir + "/iso-2");
 
     if (trim_ascii(env.umaskOut) != "0022") {
         xorrisoCmd = "umask 022; " + xorrisoCmd;
@@ -379,14 +388,22 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
 
     plan_message(p, "Creating CD/DVD image file...");
     plan_run_cmd(p, xorrisoCmd, false);
-    
+
     // Check if xorriso succeeded - match Qt behavior (work.cpp:676-681)
     plan_run_cmd(p, "CHECK_RESULT else ERROR: Could not create ISO file, please check whether you have enough space on the destination partition.", false);
+
+    plan_run_cmd(p,
+                 std::string("mv -f ") + WorkCppUtils::shellQuoteSingleQuoted(isoTempPath) + " "
+                     + WorkCppUtils::shellQuoteSingleQuoted(isoFinalPath),
+                 false);
+    plan_run_cmd(p, "CHECK_RESULT else ERROR: Could not finalize ISO file.", false);
+    plan_run_cmd(p, std::string("FSYNC_FILE ") + isoFinalPath, false);
 
     if (settings.makeIsohybrid) {
         plan_message(p, "Making hybrid iso");
         plan_run_cmd(p,
-                     std::string("isohybrid --uefi \"") + (settings.snapshotDir + "/" + filename) + "\"",
+                     std::string("isohybrid --uefi ")
+                         + WorkCppUtils::shellQuoteSingleQuoted(isoFinalPath),
                      false);
         plan_run_cmd(p,
                      "CHECK_RESULT else ERROR: Could not make the ISO bootable as a hybrid image.",
@@ -398,8 +415,8 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
         plan_run_cmd(p, "sync", false);
         plan_chdir(p, settings.snapshotDir);
         plan_run_cmd(p,
-                     std::string("md5sum \"") + filename + "\">\"" + settings.snapshotDir + "/" + filename
-                         + ".md5\"",
+                     std::string("md5sum ") + WorkCppUtils::shellQuoteSingleQuoted(filename) + " > "
+                         + WorkCppUtils::shellQuoteSingleQuoted(settings.snapshotDir + "/" + filename + ".md5"),
                      false);
         plan_chdir(p, settings.workDir);
     }
@@ -409,8 +426,8 @@ WorkCppPlan WorkCppPlanner::planCreateIso(const SettingsCpp &settings,
         plan_run_cmd(p, "sync", false);
         plan_chdir(p, settings.snapshotDir);
         plan_run_cmd(p,
-                     std::string("sha512sum \"") + filename + "\">\"" + settings.snapshotDir + "/" + filename
-                         + ".sha512\"",
+                     std::string("sha512sum ") + WorkCppUtils::shellQuoteSingleQuoted(filename) + " > "
+                         + WorkCppUtils::shellQuoteSingleQuoted(settings.snapshotDir + "/" + filename + ".sha512"),
                      false);
         plan_chdir(p, settings.workDir);
     }
@@ -444,9 +461,8 @@ WorkCppPlan WorkCppPlanner::planCopyNewIso(const SettingsCpp &settings, const Co
                  std::string("EMBED_EXTRACT_ISO_TEMPLATE ") + settings.workDir + "/iso-template",
                  false);
     const std::string vmlinuzSource = vmlinuz_image_path_like_qt(settings.kernel);
-    plan_run_cmd(p,
-                 std::string("cp \"") + vmlinuzSource + "\" iso-template/antiX/vmlinuz",
-                 false);
+    const std::string vmlinuzDest = settings.workDir + "/iso-template/antiX/vmlinuz";
+    plan_file_copy(p, vmlinuzSource, vmlinuzDest, true);
     plan_run_cmd(p,
                  "CHECK_RESULT else ERROR: Could not copy kernel (vmlinuz) into ISO template.",
                  false);
@@ -529,6 +545,9 @@ WorkCppPlan WorkCppPlanner::planCopyNewIso(const SettingsCpp &settings, const Co
                  "CHECK_RESULT else ERROR: Could not build initrd.gz.",
                  false);
     plan_run_cmd(p,
+                 std::string("FSYNC_FILE ") + settings.workDir + "/iso-template/antiX/initrd.gz",
+                 false);
+    plan_run_cmd(p,
                  std::string("MD5_CHECKSUM ") + settings.workDir + "/iso-template/antiX initrd.gz",
                  false);
 
@@ -540,12 +559,8 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
 {
     WorkCppPlan p;
 
-    const std::string bindRootPathForInstalledToLive = env.bindRootOverlayActive
-                                                           ? std::string("/.bind-root")
-                                                           : (env.setupBindRootOverlayOk
-                                                                  ? (std::string("/run/") + env.applicationName
-                                                                     + "/bind-root-overlay/root")
-                                                                  : std::string("/.bind-root"));
+    const std::string bindRootPathForInstalledToLive = WorkCppUtils::bindRootPathForInstalledToLive(
+        env.applicationName, env.bindRootOverlayActive, env.setupBindRootOverlayOk);
 
     if (!env.workDirContainsS4Snapshot) {
         plan_abort(p, "setupEnv workDir does not contain s4-snapshot");
@@ -560,10 +575,6 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
     if (env.bootIsMountpoint) {
         bind_boot = "bind=/boot ";
         bind_boot_too = ",/boot";
-    }
-
-    if (settings.forceInstaller && env.needInstallCalamares) {
-        plan_run_cmd(p, "INSTALL_PACKAGE calamares-settings-debian", false);
     }
 
     // writeSnapshotInfo()
@@ -616,17 +627,22 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
 
         plan_proc_root(p, "mkdir", {"-p", overlayBase, lowerDir, upperDir, workDir, bindRoot}, true);
 
-        // mountpoint -q returns 1 when not mounted (expected). Legacy probes inline and
-        // only umounts on success; env flags come from the same probe at plan time.
+        plan_proc_root(p, "mountpoint", {"-q", bindRoot}, true);
         if (env.setupBindRootOverlay_bindRootIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", bindRoot}, true);
         }
 
+        plan_proc_root(p, "mountpoint", {"-q", lowerDir}, true);
         if (env.setupBindRootOverlay_lowerIsMountpoint) {
             plan_proc_root(p, "umount", {"--recursive", lowerDir}, true);
         }
 
         plan_proc_root(p, "mount", {"--bind", "/", lowerDir}, true);
+        if (env.setupBindRootOverlay_bindMountOk) {
+            plan_run_cmd(p,
+                         "CHECK_RESULT overlay_bind_mount else ERROR: Could not prepare a safe bind-root overlay (bind mount).",
+                         true);
+        }
         if (!env.setupBindRootOverlay_bindMountOk) {
             plan_message_box(p,
                              BoxType::critical,
@@ -643,6 +659,25 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
                         std::string("lowerdir=") + lowerDir + ",upperdir=" + upperDir + ",workdir=" + workDir,
                         bindRoot},
                        true);
+        if (env.setupBindRootOverlay_overlayMountOk) {
+            plan_run_cmd(p,
+                         "CHECK_RESULT overlay_mount else ERROR: Could not prepare a safe bind-root overlay (overlay mount).",
+                         true);
+            plan_run_cmd(p,
+                         std::string("test -d ")
+                             + WorkCppUtils::shellQuoteSingleQuoted(bindRoot + "/etc"),
+                         false);
+            plan_run_cmd(p,
+                         "CHECK_RESULT else ERROR: Bind-root overlay /etc is not accessible.",
+                         true);
+            plan_run_cmd(p,
+                         std::string("test -f ")
+                             + WorkCppUtils::shellQuoteSingleQuoted(bindRoot + "/etc/passwd"),
+                         false);
+            plan_run_cmd(p,
+                         "CHECK_RESULT else ERROR: Bind-root overlay /etc/passwd is not accessible.",
+                         true);
+        }
         if (!env.setupBindRootOverlay_overlayMountOk) {
             plan_proc_root(p, "umount", {"--recursive", lowerDir}, true);
             plan_message_box(p,
@@ -710,6 +745,21 @@ WorkCppPlan WorkCppPlanner::planSetupEnv(const SettingsCpp &settings, const Setu
         plan_proc_root(p, "installed-to-live", args, false);
         plan_run_cmd(p,
                      "CHECK_RESULT installed-to-live normal else ERROR: Could not prepare the snapshot bind-root environment.",
+                     true);
+    }
+
+    if (env.needInstallCalamares) {
+        std::vector<std::string> embedArgs;
+        embedArgs.push_back(std::string("--bind-root=") + bindRootPathForInstalledToLive);
+        if (!settings.installerDebsDir.empty()) {
+            embedArgs.push_back(std::string("--debs-dir=") + settings.installerDebsDir);
+        }
+        const std::string suite = settings.codename.empty() ? std::string("bookworm") : settings.codename;
+        embedArgs.push_back(std::string("--suite=") + suite);
+        embedArgs.push_back("--fetch-missing");
+        plan_proc_root(p, "embed_installer", embedArgs, false);
+        plan_run_cmd(p,
+                     "CHECK_RESULT embed_installer else ERROR: Could not embed installer into snapshot.",
                      true);
     }
     

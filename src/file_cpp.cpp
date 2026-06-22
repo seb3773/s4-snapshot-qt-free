@@ -188,7 +188,22 @@ bool FileCpp::remove(const std::string &fileName)
     return ::unlink(fileName.c_str()) == 0;
 }
 
-bool FileCpp::copy(const std::string &sourceFileName, const std::string &destFileName)
+bool FileCpp::fsyncPath(const std::string &filePath)
+{
+    if (filePath.empty()) {
+        return false;
+    }
+    errno = 0;
+    const int fd = ::open(filePath.c_str(), O_RDONLY);
+    if (fd < 0) {
+        return false;
+    }
+    const bool ok = ::fsync(fd) == 0;
+    (void)::close(fd);
+    return ok;
+}
+
+bool FileCpp::copy(const std::string &sourceFileName, const std::string &destFileName, bool fsyncData)
 {
     if (g_hooks && g_hooks->copy) {
         return g_hooks->copy(sourceFileName, destFileName);
@@ -199,6 +214,13 @@ bool FileCpp::copy(const std::string &sourceFileName, const std::string &destFil
     if (exists(destFileName)) {
         return false;
     }
+
+    struct stat sourceSt;
+    errno = 0;
+    if (::stat(sourceFileName.c_str(), &sourceSt) != 0) {
+        return false;
+    }
+    const off_t expectedSize = sourceSt.st_size;
 
     errno = 0;
     const int inFd = ::open(sourceFileName.c_str(), O_RDONLY);
@@ -253,17 +275,33 @@ bool FileCpp::copy(const std::string &sourceFileName, const std::string &destFil
     }
 
     // Copy permissions (best-effort)
-    struct stat st;
-    if (::stat(sourceFileName.c_str(), &st) == 0) {
-        (void)::fchmod(outFd, st.st_mode & 07777);
+    if (ok) {
+        (void)::fchmod(outFd, sourceSt.st_mode & 07777);
+    }
+
+    if (ok && fsyncData) {
+        if (::fsync(outFd) != 0) {
+            ok = false;
+        }
     }
 
     (void)::close(inFd);
     (void)::close(outFd);
     if (!ok) {
         (void)remove(destFileName);
+        return false;
     }
-    return ok;
+
+    struct stat destSt;
+    if (::stat(destFileName.c_str(), &destSt) != 0) {
+        (void)remove(destFileName);
+        return false;
+    }
+    if (destSt.st_size != expectedSize) {
+        (void)remove(destFileName);
+        return false;
+    }
+    return true;
 }
 
 bool FileCpp::link(const std::string &sourceFileName, const std::string &linkName)
